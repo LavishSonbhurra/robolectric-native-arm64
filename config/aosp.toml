@@ -1,0 +1,25 @@
+# Single source of truth for what we build from.
+#
+# Changing `tag` and re-running tools/fetch.py, tools/bp2cmake.py and the
+# CMake configure step is all that is needed to move to a new AOSP release
+# (plus updating patches/ and overrides/ if upstream changed under them).
+
+[aosp]
+gitiles = "https://android.googlesource.com"
+# Manifest tag. Every project in the closure is resolved to the commit this
+# tag points at in that project, and the commit is recorded in
+# config/sources.lock.json.
+tag = "android-16.0.0_r1"
+
+[release]
+# Release config used for aconfig flag values and release_flag() selects.
+# bp2a is what `aosp_current` aliases to at this tag (see
+# build/release/release_config_map.textproto), i.e. the Android 16 release.
+config = "bp2a"
+# Build variant overlay (build/release/release_configs/<variant>.textproto).
+variant = "user"
+
+[variant]
+# The Soong variant we evaluate Android.bp files for.
+os = "linux_glibc"
+arch = "arm64"

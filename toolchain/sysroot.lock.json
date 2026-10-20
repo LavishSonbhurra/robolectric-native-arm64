@@ -1,0 +1,61 @@
+{
+ "arch": "arm64",
+ "gcc_version": "10",
+ "inrelease_sha256": "7917d4598768bfc4a25776eb0f6bf2f7d1f13301c2dc1e16467ef170dd752d40",
+ "keyring": {
+  "deb": "debian-archive-keyring_2025.1ubuntu1_all.deb",
+  "sha256": "b5f307b91c4491fc6f83d0a2dbd91a876244363a4910681db0177833656f6037",
+  "source": "apt-get download debian-archive-keyring"
+ },
+ "packages": {
+  "base-files": {
+   "filename": "pool/main/b/base-files/base-files_11.1+deb11u11_arm64.deb",
+   "sha256": "439b80966a0de3946c69981723318c5729d34724e9bf64793b8b8f8237b8fca3",
+   "size": 70240,
+   "version": "11.1+deb11u11"
+  },
+  "gcc-10-base": {
+   "filename": "pool/main/g/gcc-10/gcc-10-base_10.2.1-6_arm64.deb",
+   "sha256": "7d782bece7b4a36bed045a7e17d17244cb8f7e4732466091b01412ebf215defb",
+   "size": 201340,
+   "version": "10.2.1-6"
+  },
+  "libc6": {
+   "filename": "pool/main/g/glibc/libc6_2.31-13+deb11u11_arm64.deb",
+   "sha256": "baaa9aa184e2f21738c5819055e6740cc5b22f198e3f416e33f82b40ff6933d8",
+   "size": 2455356,
+   "version": "2.31-13+deb11u11"
+  },
+  "libc6-dev": {
+   "filename": "pool/main/g/glibc/libc6-dev_2.31-13+deb11u11_arm64.deb",
+   "sha256": "28d478134722dcd4b0bd2045a199301d18713bf95947b9fce66634e7aeacab2e",
+   "size": 2029884,
+   "version": "2.31-13+deb11u11"
+  },
+  "libgcc-10-dev": {
+   "filename": "pool/main/g/gcc-10/libgcc-10-dev_10.2.1-6_arm64.deb",
+   "sha256": "80fc73d339ada2e194175afe83cd89014565242153b6e3c2128849d8817da367",
+   "size": 876396,
+   "version": "10.2.1-6"
+  },
+  "libgcc-s1": {
+   "filename": "pool/main/g/gcc-10/libgcc-s1_10.2.1-6_arm64.deb",
+   "sha256": "e2fcdb378d3c1ad1bcb64d4fb6b37aab44011152beca12a4944f435a2582df1f",
+   "size": 34572,
+   "version": "10.2.1-6"
+  },
+  "linux-libc-dev": {
+   "filename": "pool/main/l/linux/linux-libc-dev_5.10.223-1_arm64.deb",
+   "sha256": "8b6374a64412d33eac61d74f77b8f932da4b8a707ea8a614791e2a35b8917618",
+   "size": 1735984,
+   "version": "5.10.223-1"
+  }
+ },
+ "packages_xz_sha256": "71a52585dc5ca78e5d682e13fc702a077c2b14355bce020ab0ff94e4ef84107a",
+ "signed_by": [
+  "1F89983E0081FDE018F3CC9673A4F27B8DD47936",
+  "A4285295FC7B1A81600062A9605C66F00D6C9793"
+ ],
+ "snapshot": "20250901T000000Z",
+ "suite": "bullseye"
+}

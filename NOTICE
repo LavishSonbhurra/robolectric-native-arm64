@@ -1,0 +1,31 @@
+robolectric-native-arm64
+Copyright 2026 Lavish Sonbhurra
+
+This repository contains build scripts, a Robolectric loader plugin, test rigs and
+documentation, licensed under the Apache License, Version 2.0 (see LICENSE).
+
+It builds on the work of others:
+
+* The Android Open Source Project (https://source.android.com). The build reads AOSP's
+  Android.bp files and compiles libandroid_runtime.so and its dependencies from AOSP
+  sources, which are downloaded at build time and are not part of this repository. The
+  files in patches/ are changes from later AOSP commits, under the license of the files
+  they modify (Apache License 2.0).
+
+* Robolectric (https://robolectric.org), Apache License 2.0. The loader plugin implements
+  Robolectric's NativeRuntimeLoader plugin interface and follows the logic of Robolectric's
+  DefaultNativeRuntimeLoader. The upstream test harness runs Robolectric's own test
+  suites, which are downloaded at test time.
+
+* The LLVM Project (libc++, libc++abi, libunwind, compiler-rt; Apache License 2.0 with
+  LLVM exceptions), the Rust project (standard library; MIT or Apache License 2.0), the
+  GNU C Library and the GCC runtime from Debian 11. These are downloaded and verified at
+  build time and are not part of this repository.
+
+This project is not affiliated with, endorsed by or supported by Google or the Robolectric
+project. Android is a trademark of Google LLC.
+
+The compiled libandroid_runtime.so contains code under many licenses. Its complete
+notices are generated at build time by cmake/notices.cmake (tools/gen_notices.py) into
+lib/NOTICE next to the library, and are shipped as THIRD_PARTY_NOTICES with every release.
+See docs/LICENSING.md.

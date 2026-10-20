@@ -1,0 +1,26 @@
+# Fetched sources, build output and downloaded toolchains (CMake build)
+/src/
+/build/
+/out/
+/dist/
+/ref/
+/rust/toolchain/
+/toolchain/dl/
+/toolchain/out/
+/toolchain/build/
+__pycache__/
+
+# Gradle (root project, loader/, tests/rig/, tests/upstream/harness/)
+.gradle/
+.kotlin/
+local.properties
+/loader/build/
+/tests/**/build/
+.work/
+
+# Local output of the test rigs
+/tests/**/out/
+/tests/upstream/src/
+/tests/upstream/results/
+/tests/upstream/lib/
+/tests/upstream/plugin/

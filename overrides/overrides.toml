@@ -1,0 +1,156 @@
+# Manual knowledge that Android.bp files do not carry, in one place.
+# Every entry says why it exists. tools/bp2cmake.py reads this file.
+
+[closure]
+# Modules to build (with their dependency closure). The root is linked as a
+# shared library; everything else is compiled to static archives.
+roots = ["libandroid_runtime"]
+# Dependencies whose sources we do not compile: only their exported headers
+# are used. Their re-exported dependencies are followed for headers only.
+headers_only = []
+
+[product_variables]
+# Product variables are per-product in Soong. The build that produces
+# android-all is a debuggable product (userdebug or eng): the official library
+# has minikin's MINIKIN_ASSERT messages and libbinder's recording and RPC dev
+# server code, which only `debuggable` compiles in (docs/rng-audit.md).
+debuggable = true
+eng = false
+platform_sdk_version = 36
+release_aidl_use_unfrozen = "release_flag:RELEASE_AIDL_USE_UNFROZEN"
+# 64-bit binder ABI (libhwbinder: -DBINDER_IPC_32BIT otherwise).
+binder32bit = false
+# Only libhidlbase's ServiceManagement uses it, which we do not build.
+enforce_vintf_manifest = false
+
+# soong_config_variable() values. In AOSP these are set from release flags by
+# build/make/core/android_soong_config_vars.mk; the mapping is mirrored here.
+[soong_config.ANDROID]
+release_binder_death_recipient_weak_from_jni = "release_flag:RELEASE_BINDER_DEATH_RECIPIENT_WEAK_FROM_JNI"
+# Only selects Java modules in frameworks/base/Android.bp.
+release_crashrecovery_module = "release_flag:RELEASE_CRASHRECOVERY_MODULE"
+
+[soong_config.libsqlite3]
+release_package_libsqlite3 = "release_flag:RELEASE_PACKAGE_LIBSQLITE3"
+
+[soong_config.libbinder]
+release_libbinder_remove_cache_static_list = "release_flag:RELEASE_LIBBINDER_REMOVE_CACHE_STATIC_LIST"
+release_libbinder_client_cache = "release_flag:RELEASE_LIBBINDER_CLIENT_CACHE"
+release_libbinder_addservice_cache = "release_flag:RELEASE_LIBBINDER_ADDSERVICE_CACHE"
+
+[toolchain]
+# Headers AOSP's clang (prebuilts/clang/host/linux-x86/clang-r547379)
+# installs in its resource directory in place of clang's own: its
+# lib/clang/20/include/stdatomic.h is bionic's stdatomic.h (in C++ it maps
+# the C11 names onto std::atomic), next to bionic's bits/stdatomic.h. Upstream
+# clang's version defines C11 macros (atomic_load, memory_order_relaxed, ...)
+# that break C++ code including <cutils/atomic.h> and <atomic> together
+# (libbinder, libhwbinder, libinput, android_util_Binder.cpp). Paths are in
+# src/; they are passed with -isystem after all other include flags, like a
+# resource directory.
+builtin_headers = { "stdatomic.h" = "bionic/libc/include/stdatomic.h", "bits/stdatomic.h" = "bionic/libc/include/bits/stdatomic.h" }
+
+[compat]
+# Extra flags appended to every C and C++ compile, after Soong's own. Soong
+# builds with clang-r547379 (clang 20); we use clang 21. Only add entries for
+# warnings that clang 21 introduced or promoted and that break -Werror, and
+# record them in docs/NOTES.md. Only diagnostic flags belong here: changing this
+# list does not rebuild objects that already compiled.
+cflags = [
+    # New in clang 21, on by default (googletest's gtest-printers.h).
+    "-Wno-error=character-conversion",
+    # New in clang 21 and part of -Wextra (ICU's final classes with virtual
+    # methods, e.g. UnicodeSet).
+    "-Wno-error=unnecessary-virtual-specifier",
+    # New in clang 21, on by default: memset/memcpy on non-trivially-copyable
+    # types (androidfw ConfigDescription, utils KeyedVector).
+    "-Wno-error=nontrivial-memcall",
+]
+# C only. glibc 2.36+ headers in C23 mode make strchr/strrchr return const
+# char * for a const argument (sqlite3.c sqlite3ShadowTableName). Soong's
+# glibc 2.17 sysroot predates this; not needed with an old-glibc sysroot.
+conlyflags = ["-Wno-error=incompatible-pointer-types-discards-qualifiers"]
+cppflags = [
+    # libc++ 21 marks type traits [[clang::no_specializations]], an error by
+    # default. AOSP's libc++ snapshot does not; frameworks/native libs/math
+    # specializes std::is_floating_point<half>. The specialization still
+    # takes effect with the diagnostic off, as with AOSP's libc++.
+    "-Wno-invalid-specialization",
+]
+
+# Per-module tweaks: [module.<name>]
+#   props = { ... }        properties appended after variant resolution
+#   extra_cflags = [...]   appended after all other flags
+#   external = true        dependency built outside bp2cmake (e.g. cargo)
+
+# ---- Tools and libraries built outside the generated CMake ----------------
+# Rust host tools are built with cargo by cmake/host_tools.cmake from the
+# same sources Soong uses. `path` may use {binary_dir}; `target` is the CMake
+# target that produces it.
+
+[tool.cxxbridge]
+# external/rust/cxx/gen/cmd (rust_binary_host)
+path = "{binary_dir}/rust/target/release/cxxbridge"
+target = "cxxbridge_tool"
+
+[module.libcompiler_rt-extras]
+# cc_prebuilt_library_static from prebuilts/clang (compiler-rt builtins that
+# libgcc lacks); libdng_sdk links it on host_linux. Provided by the system
+# toolchain's compiler-rt at link time.
+external = true
+
+# ---- Milestone 2: libandroid_runtime closure -------------------------------
+
+[module.libandroid_runtime]
+# The official library does not register these three JNI files: at this tag
+# platform/host/HostRuntime.cpp has no entries for InputChannel,
+# InputEventReceiver or InputEventSender, and the reference x86_64 library
+# (BLR2.250402.052) has none of their class or method strings. They are the
+# only users of libinput's InputTransport (InputPublisher/InputConsumer), and
+# through it of the `input` Rust crate. Dropping them keeps both out of the
+# link, as in the official build.
+#
+# ldflags: Soong adds -static-libgcc in target.linux_glibc_x86_64 only (there
+# is no linux_glibc_arm64 toolchain). The same flag is the arm64 equivalent:
+# libgcc.a and libgcc_eh.a instead of a libgcc_s.so dependency (the official
+# library has no libgcc_s NEEDED entry).
+props = { exclude_srcs = [
+    "android_view_InputChannel.cpp",
+    "android_view_InputEventReceiver.cpp",
+    "android_view_InputEventSender.cpp",
+], ldflags = ["-static-libgcc"] }
+
+[module.libinput]
+# MotionPredictor.cpp, MotionPredictorMetricsManager.cpp and
+# TfLiteMotionPredictor.cpp need TensorFlow Lite, flatbuffers and Eigen
+# headers and libtflite_static. Their only user is
+# android_view_MotionPredictor.cpp, which is in libandroid_runtime's android
+# section only, so nothing in the host link references them (checked by the
+# --no-undefined link: any reference would fail it). libstatslog_libinput is
+# android-only already. libtinyxml2 and libPlatformProperties are listed as
+# shared_libs but no libinput source includes their headers.
+props = { exclude_srcs = [
+    "MotionPredictor.cpp",
+    "MotionPredictorMetricsManager.cpp",
+    "TfLiteMotionPredictor.cpp",
+], exclude_static_libs = ["libtflite_static"], exclude_header_libs = [
+    "flatbuffer_headers", "tensorflow_headers", "libeigen",
+], exclude_shared_libs = ["libtinyxml2", "libPlatformProperties"] }
+
+[module.libhidlbase]
+# libandroid_runtime lists libhidlbase only for libhwbinder (its comment says
+# so): libbinderthreadstateutils calls hardware::IPCThreadState::selfOrNull().
+# libhidlbase's own sources and its hidl-gen generated android.hidl.base and
+# android.hidl.manager code are not referenced by any host source (no host
+# source includes hidl headers; the reference library has no android.hidl
+# strings), so we do not run hidl-gen. Its whole_static_libs
+# (libhwbinder-impl-internal) are built and linked; the --no-undefined link
+# proves nothing else is needed.
+link_only = true
+
+[module.libminikin_rust_ffi]
+# rust_ffi_static (frameworks/minikin/rust). The Rust code comes from the
+# rust track as the imported target `rustlibs` (librustlibs.a). Its C++
+# halves (libminikin_from_rust_to_cpp, libcxxbridge05 via libcxx,
+# libflags_rust_cpp_bridge) are cc modules and are built here; bp2cmake finds
+# them through the rust module's whole_static_libs/static_libs/rustlibs.

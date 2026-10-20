@@ -1,0 +1,137 @@
+CursorWindow JNI: @CriticalNative grouping of the method table (the
+android_database_CursorWindow.cpp part of an upstream commit only)
+
+Upstream: platform/frameworks/base commit 06b30aa5b9305c5da3368bca6c811cb3e0a12be9
+  "Update @CriticalNative usage for framework methods"
+  Author Jared Duke, 2025-07-25. Change-Id I9270f90cca024b2fa2689b7a41cab60d016ee9d6, Bug 374158990.
+  First tagged in android-16.0.0_r4 (not in r1, r2 or r3).
+Diff fetched from
+  https://android.googlesource.com/platform/frameworks/base/+/06b30aa5b9305c5da3368bca6c811cb3e0a12be9%5E%21/
+  and reduced to its core/jni/android_database_CursorWindow.cpp hunks, which
+  are unchanged. The other files of the commit are left out: android_os_Trace.cpp
+  and android_tracing_PerfettoDataSource.cpp are not built for the host, and
+  the android_util_Binder.cpp hunk changes neither code nor table order there.
+
+Why: prerequisite of 0003 (a86bb7e464 is written against this version of
+the file), and it is what the official library has. On the host
+CRITICAL_JNI_PARAMS_COMMA expands to "JNIEnv*, jclass," (core_jni_helpers.h),
+so the functions are unchanged; the only effect is the order of the
+CursorWindow JNINativeMethod table. The official library (BLR2.250402.052)
+registers nativeAllocRow, nativeGetLong, nativeGetDouble, then nativeClear,
+nativeGetNumRows, nativeFreeLastRow, nativeGetType, nativeSetNumColumns,
+which is this commit's order (r1: nativeClear, nativeGetNumRows,
+nativeSetNumColumns, nativeAllocRow, ...).
+
+diff --git a/core/jni/android_database_CursorWindow.cpp b/core/jni/android_database_CursorWindow.cpp
+index c0e9215..347f6d2 100644
+--- a/core/jni/android_database_CursorWindow.cpp
++++ b/core/jni/android_database_CursorWindow.cpp
+@@ -155,7 +155,7 @@
+     }
+ }
+ 
+-static void nativeClear(JNIEnv * env, jclass clazz, jlong windowPtr) {
++static void nativeClear(CRITICAL_JNI_PARAMS_COMMA jlong windowPtr) {
+     CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
+     LOG_WINDOW("Clearing window %p", window);
+     status_t status = window->clear();
+@@ -164,13 +164,12 @@
+     }
+ }
+ 
+-static jint nativeGetNumRows(JNIEnv* env, jclass clazz, jlong windowPtr) {
++static jint nativeGetNumRows(CRITICAL_JNI_PARAMS_COMMA jlong windowPtr) {
+     CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
+     return window->getNumRows();
+ }
+ 
+-static jboolean nativeSetNumColumns(JNIEnv* env, jclass clazz, jlong windowPtr,
+-        jint columnNum) {
++static jboolean nativeSetNumColumns(CRITICAL_JNI_PARAMS_COMMA jlong windowPtr, jint columnNum) {
+     CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
+     status_t status = window->setNumColumns(columnNum);
+     return status == OK;
+@@ -182,13 +181,12 @@
+     return status == OK;
+ }
+ 
+-static void nativeFreeLastRow(JNIEnv* env, jclass clazz, jlong windowPtr) {
++static void nativeFreeLastRow(CRITICAL_JNI_PARAMS_COMMA jlong windowPtr) {
+     CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
+     window->freeLastRow();
+ }
+ 
+-static jint nativeGetType(JNIEnv* env, jclass clazz, jlong windowPtr,
+-        jint row, jint column) {
++static jint nativeGetType(CRITICAL_JNI_PARAMS_COMMA jlong windowPtr, jint row, jint column) {
+     CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
+     LOG_WINDOW("returning column type affinity for %d,%d from %p", row, column, window);
+ 
+@@ -478,8 +476,8 @@
+     return true;
+ }
+ 
+-static jboolean nativePutLong(JNIEnv* env, jclass clazz, jlong windowPtr,
+-        jlong value, jint row, jint column) {
++static jboolean nativePutLong(CRITICAL_JNI_PARAMS_COMMA jlong windowPtr, jlong value, jint row,
++                              jint column) {
+     CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
+     status_t status = window->putLong(row, column, value);
+ 
+@@ -492,8 +490,8 @@
+     return true;
+ }
+ 
+-static jboolean nativePutDouble(JNIEnv* env, jclass clazz, jlong windowPtr,
+-        jdouble value, jint row, jint column) {
++static jboolean nativePutDouble(CRITICAL_JNI_PARAMS_COMMA jlong windowPtr, jdouble value, jint row,
++                                jint column) {
+     CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
+     status_t status = window->putDouble(row, column, value);
+ 
+@@ -506,8 +504,7 @@
+     return true;
+ }
+ 
+-static jboolean nativePutNull(JNIEnv* env, jclass clazz, jlong windowPtr,
+-        jint row, jint column) {
++static jboolean nativePutNull(CRITICAL_JNI_PARAMS_COMMA jlong windowPtr, jint row, jint column) {
+     CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
+     status_t status = window->putNull(row, column);
+ 
+@@ -546,23 +543,25 @@
+             (void*)nativePutString },
+ 
+     // ------- @FastNative below here ----------------------
+-    { "nativeClear", "(J)V",
+-            (void*)nativeClear },
+-    { "nativeGetNumRows", "(J)I",
+-            (void*)nativeGetNumRows },
+-    { "nativeSetNumColumns", "(JI)Z",
+-            (void*)nativeSetNumColumns },
+     { "nativeAllocRow", "(J)Z",
+             (void*)nativeAllocRow },
+-    { "nativeFreeLastRow", "(J)V",
+-            (void*)nativeFreeLastRow },
+-    { "nativeGetType", "(JII)I",
+-            (void*)nativeGetType },
+     { "nativeGetLong", "(JII)J",
+             (void*)nativeGetLong },
+     { "nativeGetDouble", "(JII)D",
+             (void*)nativeGetDouble },
+ 
++
++    // ------- @CriticalNative below here ------------------
++    { "nativeClear", "(J)V",
++            (void*)nativeClear },
++    { "nativeGetNumRows", "(J)I",
++            (void*)nativeGetNumRows },
++    { "nativeFreeLastRow", "(J)V",
++            (void*)nativeFreeLastRow },
++    { "nativeGetType", "(JII)I",
++            (void*)nativeGetType },
++    { "nativeSetNumColumns", "(JI)Z",
++            (void*)nativeSetNumColumns },
+     { "nativePutLong", "(JJII)Z",
+             (void*)nativePutLong },
+     { "nativePutDouble", "(JDII)Z",

@@ -1,0 +1,54 @@
+# Policy for tools/gen_notices.py --check.
+#
+# allowed_kinds: licence kinds (Soong license_kinds names) that may appear in a
+# component whose code is linked into the library. AOSP attaches one licence
+# module to a whole project or directory, so a component lists the kinds of
+# files that are not compiled as well; those are marked below. Anything else
+# fails the build until someone reads it and either adds it here or removes
+# the component.
+allowed_kinds = [
+  "SPDX-license-identifier-Apache-2.0",
+  "SPDX-license-identifier-BSD",
+  "SPDX-license-identifier-BSD-3-Clause",
+  "SPDX-license-identifier-MIT",
+  "SPDX-license-identifier-ISC",
+  "SPDX-license-identifier-Zlib",
+  "SPDX-license-identifier-ICU",
+  "SPDX-license-identifier-Unicode-3.0",
+  "SPDX-license-identifier-Unicode-DFS",
+  "SPDX-license-identifier-FTL",
+  "SPDX-license-identifier-CC0-1.0",
+  "SPDX-license-identifier-W3C",
+  "SPDX-license-identifier-NCSA",      # hardware/interfaces project licence module
+  "legacy_permissive",                 # sqlite (public domain)
+  "legacy_notice",
+  "legacy_unencumbered",
+  "SPDX-license-identifier-FSFAP",     # autoconf macro files, not compiled
+  "SPDX-license-identifier-OFL",       # harfbuzz test fonts, not compiled
+  "SPDX-license-identifier-CC-BY",     # frameworks/base docs, not compiled
+  "SPDX-license-identifier-EPL",       # ICU test data, not compiled
+  "SPDX-license-identifier-GFDL",      # expat docs, not compiled
+  "SPDX-license-identifier-PSF-2.0",   # fmtlib Python scripts, not compiled
+  "SPDX-license-identifier-Beerware",  # libjpeg-turbo test helper, not compiled
+]
+
+# Components whose licence is a special agreement or "by exception only" in
+# AOSP. Each needs a human decision, recorded here with the reason. The reason
+# is printed in the NOTICE file.
+[[acknowledged]]
+id = "external_dng_sdk_license"
+reason = """Adobe DNG SDK License Agreement plus a patent grant. Permissive, with an
+indemnification clause for commercial distributors (section 5) and a mandatory
+notice."""
+
+[[acknowledged]]
+id = "external_freetype_license"
+reason = """FreeType is dual licensed (FTL or GPLv2+). This library uses it under
+the FTL. The LGPL kind in the AOSP licence module comes from a bulk licence
+import: no compiled or included file under src/ or include/ carries an LGPL or
+GPL header."""
+
+[[acknowledged]]
+id = "adobe_hdr_gain_map_license"
+reason = """libultrahdr: Apache-2.0 code plus a required notice. The terms of the
+Adobe gain map licence are not in the source tree."""

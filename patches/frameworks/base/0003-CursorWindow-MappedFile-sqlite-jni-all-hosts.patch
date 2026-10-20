@@ -1,0 +1,475 @@
+CursorWindow: MappedFile instead of mmap, sqlite JNI built for every host
+
+Upstream: platform/frameworks/base commit a86bb7e464664498ab03bb320cd93957c3f8e2b7
+  "Make sqlite JNI available for host Mac and Windows in libandroid_runtime"
+  Author Michael Hoisie, 2025-08-05; committed 2025-08-08, merged into main
+  2025-08-11. Change-Id I150fd216971cf486beda7c187945a758ebe5589c, Bug 317884162, 437248474.
+  Roll-forward of the 2024 pair "Use MappedFile for mmap-related operations
+  in CursorWindow" and "Enable SQLite JNI for host Mac and Windows", both
+  reverted in October 2024, before android-16.0.0_r1.
+  First tagged in android-16.0.0_r4 (not in r1, r2 or r3).
+Diff fetched unchanged from
+  https://android.googlesource.com/platform/frameworks/base/+/a86bb7e464664498ab03bb320cd93957c3f8e2b7%5E%21/
+Needs 0002 (applies with line offsets only; afterwards the four changed
+source files are byte-identical to the commit's versions).
+
+Why: the official library (BLR2.250402.052) has this change. Evidence from
+its x86_64 disassembly, against our x86_64 build of r1:
+  * CursorWindow layout: every field after mAshmemFd sits 8 bytes later
+    (CursorWindow::writeToParcel reads mData at 0x18 and the slot offsets
+    at 0x38/0x3c; r1 has 0x10, 0x30/0x34): the added
+    std::unique_ptr<MappedFile> mMappedFile member.
+  * mmap/munmap: the official library has 17 direct mmap and 16 munmap call
+    sites, ours 19 and 18. Matching the official mmap sites to ours by the
+    strings around them leaves out exactly CursorWindow::maybeInflate and
+    createFromParcel; after this commit those, and the munmap in
+    ~CursorWindow and maybeInflate, go through MappedFile.
+  * JNI: the CursorWindow table starts nativeCreate, nativeDispose,
+    nativeCreateFromParcel, nativeWriteToParcel (r1: nativeCreate,
+    nativeCreateFromParcel, nativeDispose, ...); with 0002 the whole table
+    matches the official one.
+On Linux the Android.bp and #ifdef __linux__ hunks select the same sources
+and libraries as before; the behaviour change is limited to CursorWindow
+memory mapping through android::base::MappedFile.
+The follow-up c80d23f520 ("Add defensive empty checks to
+CursorWindow.{writeTo,createFrom}Parcel") is not in the official library
+(its writeToParcel has no mNumRows == 0 branch) and is not applied.
+
+diff --git a/core/jni/Android.bp b/core/jni/Android.bp
+index 9eb98503..f35b8d4 100644
+--- a/core/jni/Android.bp
++++ b/core/jni/Android.bp
+@@ -74,6 +74,12 @@
+     srcs: [
+         "android_animation_PropertyValuesHolder.cpp",
+         "android_content_res_ApkAssets.cpp",
++        "android_database_CursorWindow.cpp",
++        "android_database_SQLiteCommon.cpp",
++        "android_database_SQLiteConnection.cpp",
++        "android_database_SQLiteGlobal.cpp",
++        "android_database_SQLiteDebug.cpp",
++        "android_database_SQLiteRawStatement.cpp",
+         "android_media_ImageReader.cpp",
+         "android_media_PublicFormatUtils.cpp",
+         "android_media_Utils.cpp",
+@@ -148,12 +154,6 @@
+                 "android_opengl_GLES31.cpp",
+                 "android_opengl_GLES31Ext.cpp",
+                 "android_opengl_GLES32.cpp",
+-                "android_database_CursorWindow.cpp",
+-                "android_database_SQLiteCommon.cpp",
+-                "android_database_SQLiteConnection.cpp",
+-                "android_database_SQLiteGlobal.cpp",
+-                "android_database_SQLiteDebug.cpp",
+-                "android_database_SQLiteRawStatement.cpp",
+                 "android_graphics_GraphicBuffer.cpp",
+                 "android_graphics_SurfaceTexture.cpp",
+                 "android_view_CompositionSamplingListener.cpp",
+@@ -444,6 +444,7 @@
+                 "libnativehelper_jvm",
+                 "libpiex",
+                 "libpng",
++                "libsqlite",
+                 "libtiff_directory",
+                 "libui-types",
+                 "libutils",
+@@ -467,12 +468,6 @@
+         },
+         host_linux: {
+             srcs: [
+-                "android_database_CursorWindow.cpp",
+-                "android_database_SQLiteCommon.cpp",
+-                "android_database_SQLiteConnection.cpp",
+-                "android_database_SQLiteGlobal.cpp",
+-                "android_database_SQLiteDebug.cpp",
+-                "android_database_SQLiteRawStatement.cpp",
+                 "android_hardware_input_InputApplicationHandle.cpp",
+                 "android_os_MessageQueue.cpp",
+                 "android_os_Parcel.cpp",
+@@ -487,7 +482,6 @@
+             ],
+             static_libs: [
+                 "libbinderthreadstateutils",
+-                "libsqlite",
+                 "libgui_window_info_static",
+                 "libbinder",
+                 "libbinder_ndk",
+diff --git a/core/jni/android_database_CursorWindow.cpp b/core/jni/android_database_CursorWindow.cpp
+index 347f6d2..b5af2f1 100644
+--- a/core/jni/android_database_CursorWindow.cpp
++++ b/core/jni/android_database_CursorWindow.cpp
+@@ -38,8 +38,10 @@
+ #define LOG_NDEBUG 1
+ 
+ #include <androidfw/CursorWindow.h>
++#ifdef __linux__
+ #include "android_os_Parcel.h"
+ #include "android_util_Binder.h"
++#endif
+ #include "android_database_SQLiteCommon.h"
+ 
+ #include "core_jni_helpers.h"
+@@ -111,6 +113,15 @@
+     return 0;
+ }
+ 
++static void nativeDispose(JNIEnv* env, jclass clazz, jlong windowPtr) {
++    CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
++    if (window) {
++        LOG_WINDOW("Closing window %p", window);
++        delete window;
++    }
++}
++
++#ifdef __linux__
+ static jlong nativeCreateFromParcel(JNIEnv* env, jclass clazz, jobject parcelObj) {
+     Parcel* parcel = parcelForJavaObject(env, parcelObj);
+ 
+@@ -129,19 +140,6 @@
+     return reinterpret_cast<jlong>(window);
+ }
+ 
+-static void nativeDispose(JNIEnv* env, jclass clazz, jlong windowPtr) {
+-    CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
+-    if (window) {
+-        LOG_WINDOW("Closing window %p", window);
+-        delete window;
+-    }
+-}
+-
+-static jstring nativeGetName(JNIEnv* env, jclass clazz, jlong windowPtr) {
+-    CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
+-    return env->NewStringUTF(window->name().c_str());
+-}
+-
+ static void nativeWriteToParcel(JNIEnv * env, jclass clazz, jlong windowPtr,
+         jobject parcelObj) {
+     CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
+@@ -154,6 +152,12 @@
+         jniThrowRuntimeException(env, msg.c_str());
+     }
+ }
++#endif
++
++static jstring nativeGetName(JNIEnv* env, jclass clazz, jlong windowPtr) {
++    CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
++    return env->NewStringUTF(window->name().c_str());
++}
+ 
+ static void nativeClear(CRITICAL_JNI_PARAMS_COMMA jlong windowPtr) {
+     CursorWindow* window = reinterpret_cast<CursorWindow*>(windowPtr);
+@@ -517,57 +521,36 @@
+     return true;
+ }
+ 
+-static const JNINativeMethod sMethods[] =
+-{
+-    /* name, signature, funcPtr */
+-    { "nativeCreate", "(Ljava/lang/String;I)J",
+-            (void*)nativeCreate },
+-    { "nativeCreateFromParcel", "(Landroid/os/Parcel;)J",
+-            (void*)nativeCreateFromParcel },
+-    { "nativeDispose", "(J)V",
+-            (void*)nativeDispose },
+-    { "nativeWriteToParcel", "(JLandroid/os/Parcel;)V",
+-            (void*)nativeWriteToParcel },
++static const JNINativeMethod sMethods[] = {
++        /* name, signature, funcPtr */
++        {"nativeCreate", "(Ljava/lang/String;I)J", (void*)nativeCreate},
++        {"nativeDispose", "(J)V", (void*)nativeDispose},
++#ifdef __linux__
++        {"nativeCreateFromParcel", "(Landroid/os/Parcel;)J", (void*)nativeCreateFromParcel},
++        {"nativeWriteToParcel", "(JLandroid/os/Parcel;)V", (void*)nativeWriteToParcel},
++#endif
++        {"nativeGetName", "(J)Ljava/lang/String;", (void*)nativeGetName},
++        {"nativeGetBlob", "(JII)[B", (void*)nativeGetBlob},
++        {"nativeGetString", "(JII)Ljava/lang/String;", (void*)nativeGetString},
++        {"nativeCopyStringToBuffer", "(JIILandroid/database/CharArrayBuffer;)V",
++         (void*)nativeCopyStringToBuffer},
++        {"nativePutBlob", "(J[BII)Z", (void*)nativePutBlob},
++        {"nativePutString", "(JLjava/lang/String;II)Z", (void*)nativePutString},
+ 
+-    { "nativeGetName", "(J)Ljava/lang/String;",
+-            (void*)nativeGetName },
+-    { "nativeGetBlob", "(JII)[B",
+-            (void*)nativeGetBlob },
+-    { "nativeGetString", "(JII)Ljava/lang/String;",
+-            (void*)nativeGetString },
+-    { "nativeCopyStringToBuffer", "(JIILandroid/database/CharArrayBuffer;)V",
+-            (void*)nativeCopyStringToBuffer },
+-    { "nativePutBlob", "(J[BII)Z",
+-            (void*)nativePutBlob },
+-    { "nativePutString", "(JLjava/lang/String;II)Z",
+-            (void*)nativePutString },
++        // ------- @FastNative below here ----------------------
++        {"nativeAllocRow", "(J)Z", (void*)nativeAllocRow},
++        {"nativeGetLong", "(JII)J", (void*)nativeGetLong},
++        {"nativeGetDouble", "(JII)D", (void*)nativeGetDouble},
+ 
+-    // ------- @FastNative below here ----------------------
+-    { "nativeAllocRow", "(J)Z",
+-            (void*)nativeAllocRow },
+-    { "nativeGetLong", "(JII)J",
+-            (void*)nativeGetLong },
+-    { "nativeGetDouble", "(JII)D",
+-            (void*)nativeGetDouble },
+-
+-
+-    // ------- @CriticalNative below here ------------------
+-    { "nativeClear", "(J)V",
+-            (void*)nativeClear },
+-    { "nativeGetNumRows", "(J)I",
+-            (void*)nativeGetNumRows },
+-    { "nativeFreeLastRow", "(J)V",
+-            (void*)nativeFreeLastRow },
+-    { "nativeGetType", "(JII)I",
+-            (void*)nativeGetType },
+-    { "nativeSetNumColumns", "(JI)Z",
+-            (void*)nativeSetNumColumns },
+-    { "nativePutLong", "(JJII)Z",
+-            (void*)nativePutLong },
+-    { "nativePutDouble", "(JDII)Z",
+-            (void*)nativePutDouble },
+-    { "nativePutNull", "(JII)Z",
+-            (void*)nativePutNull },
++        // ------- @CriticalNative below here ------------------
++        {"nativeClear", "(J)V", (void*)nativeClear},
++        {"nativeGetNumRows", "(J)I", (void*)nativeGetNumRows},
++        {"nativeFreeLastRow", "(J)V", (void*)nativeFreeLastRow},
++        {"nativeGetType", "(JII)I", (void*)nativeGetType},
++        {"nativeSetNumColumns", "(JI)Z", (void*)nativeSetNumColumns},
++        {"nativePutLong", "(JJII)Z", (void*)nativePutLong},
++        {"nativePutDouble", "(JDII)Z", (void*)nativePutDouble},
++        {"nativePutNull", "(JII)Z", (void*)nativePutNull},
+ };
+ 
+ int register_android_database_CursorWindow(JNIEnv* env)
+diff --git a/core/jni/platform/host/HostRuntime.cpp b/core/jni/platform/host/HostRuntime.cpp
+index 1e8da73..a8cee40 100644
+--- a/core/jni/platform/host/HostRuntime.cpp
++++ b/core/jni/platform/host/HostRuntime.cpp
+@@ -120,7 +120,6 @@
+         {"android.content.res.AssetManager", REG_JNI(register_android_content_AssetManager)},
+         {"android.content.res.StringBlock", REG_JNI(register_android_content_StringBlock)},
+         {"android.content.res.XmlBlock", REG_JNI(register_android_content_XmlBlock)},
+-#ifdef __linux__
+         {"android.database.CursorWindow", REG_JNI(register_android_database_CursorWindow)},
+         {"android.database.sqlite.SQLiteConnection",
+          REG_JNI(register_android_database_SQLiteConnection)},
+@@ -128,7 +127,6 @@
+         {"android.database.sqlite.SQLiteDebug", REG_JNI(register_android_database_SQLiteDebug)},
+         {"android.database.sqlite.SQLiteRawStatement",
+          REG_JNI(register_android_database_SQLiteRawStatement)},
+-#endif
+         {"android.media.ImageReader", REG_JNI(register_android_media_ImageReader)},
+         {"android.media.PublicFormatUtils", REG_JNI(register_android_media_PublicFormatUtils)},
+ #ifdef __linux__
+diff --git a/libs/androidfw/Android.bp b/libs/androidfw/Android.bp
+index 2e092ae..ddc1063 100644
+--- a/libs/androidfw/Android.bp
++++ b/libs/androidfw/Android.bp
+@@ -75,6 +75,7 @@
+         "BigBufferStream.cpp",
+         "ChunkIterator.cpp",
+         "ConfigDescription.cpp",
++        "CursorWindow.cpp",
+         "FileStream.cpp",
+         "Idmap.cpp",
+         "LoadedArsc.cpp",
+@@ -114,7 +115,6 @@
+             srcs: [
+                 "BackupData.cpp",
+                 "BackupHelpers.cpp",
+-                "CursorWindow.cpp",
+             ],
+             shared_libs: [
+                 "libbase",
+@@ -148,11 +148,6 @@
+                 "libz",
+             ],
+         },
+-        host_linux: {
+-            srcs: [
+-                "CursorWindow.cpp",
+-            ],
+-        },
+         windows: {
+             enabled: true,
+         },
+@@ -221,6 +216,7 @@
+         "tests/Config_test.cpp",
+         "tests/ConfigDescription_test.cpp",
+         "tests/ConfigLocale_test.cpp",
++        "tests/CursorWindow_test.cpp",
+         "tests/DynamicRefTable_test.cpp",
+         "tests/FileStream_test.cpp",
+         "tests/Idmap_test.cpp",
+@@ -245,7 +241,6 @@
+             srcs: [
+                 "tests/BackupData_test.cpp",
+                 "tests/BackupHelpers_test.cpp",
+-                "tests/CursorWindow_test.cpp",
+                 "tests/ObbFile_test.cpp",
+                 "tests/PosixUtils_test.cpp",
+             ],
+@@ -257,6 +252,7 @@
+         },
+         host: {
+             static_libs: common_test_libs + [
++                "libbinder",
+                 "liblog",
+                 "libz",
+             ],
+diff --git a/libs/androidfw/CursorWindow.cpp b/libs/androidfw/CursorWindow.cpp
+index 6e11d43..7b6bc68 100644
+--- a/libs/androidfw/CursorWindow.cpp
++++ b/libs/androidfw/CursorWindow.cpp
+@@ -18,11 +18,12 @@
+ 
+ #include <androidfw/CursorWindow.h>
+ 
+-#include <sys/mman.h>
+-
+ #include "android-base/logging.h"
++#include "android-base/mapped_file.h"
+ #include "cutils/ashmem.h"
+ 
++using android::base::MappedFile;
++
+ namespace android {
+ 
+ /**
+@@ -39,7 +40,7 @@
+ 
+ CursorWindow::~CursorWindow() {
+     if (mAshmemFd >= 0) {
+-        ::munmap(mData, mSize);
++        mMappedFile.reset();
+         ::close(mAshmemFd);
+     } else {
+         free(mData);
+@@ -75,6 +76,7 @@
+ status_t CursorWindow::maybeInflate() {
+     int ashmemFd = 0;
+     void* newData = nullptr;
++    std::unique_ptr<MappedFile> newMappedFile = nullptr;
+ 
+     // Bail early when we can't expand any further
+     if (mReadOnly || mSize == mInflatedSize) {
+@@ -95,11 +97,12 @@
+         goto fail_silent;
+     }
+ 
+-    newData = ::mmap(nullptr, mInflatedSize, PROT_READ | PROT_WRITE, MAP_SHARED, ashmemFd, 0);
+-    if (newData == MAP_FAILED) {
++    newMappedFile = MappedFile::FromFd(ashmemFd, 0, mInflatedSize, PROT_READ | PROT_WRITE);
++    if (newMappedFile == nullptr) {
+         PLOG(ERROR) << "Failed mmap";
+         goto fail_silent;
+     }
++    newData = newMappedFile->data();
+ 
+     if (ashmem_set_prot_region(ashmemFd, PROT_READ) < 0) {
+         PLOG(ERROR) << "Failed ashmem_set_prot_region";
+@@ -117,6 +120,7 @@
+ 
+         free(mData);
+         mAshmemFd = ashmemFd;
++        mMappedFile = std::move(newMappedFile);
+         mData = newData;
+         mSize = mInflatedSize;
+         mSlotsOffset = newSlotsOffset;
+@@ -130,11 +134,12 @@
+ fail:
+     LOG(ERROR) << "Failed maybeInflate";
+ fail_silent:
+-    ::munmap(newData, mInflatedSize);
++    newMappedFile.reset();
+     ::close(ashmemFd);
+     return UNKNOWN_ERROR;
+ }
+ 
++#ifdef __linux__
+ status_t CursorWindow::createFromParcel(Parcel* parcel, CursorWindow** outWindow) {
+     *outWindow = nullptr;
+ 
+@@ -166,13 +171,13 @@
+             PLOG(ERROR) << "Failed F_DUPFD_CLOEXEC";
+             goto fail_silent;
+         }
+-
+-        window->mData = ::mmap(nullptr, window->mSize, PROT_READ, MAP_SHARED, tempFd, 0);
+-        if (window->mData == MAP_FAILED) {
++        window->mMappedFile = MappedFile::FromFd(tempFd, 0, window->mSize, PROT_READ);
++        if (window->mMappedFile == nullptr) {
+             ::close(tempFd);
+             PLOG(ERROR) << "Failed mmap";
+             goto fail_silent;
+         }
++        window->mData = window->mMappedFile->data();
+ 
+         window->mAshmemFd = tempFd;
+ 
+@@ -239,6 +244,7 @@
+ fail_silent:
+     return UNKNOWN_ERROR;
+ }
++#endif
+ 
+ status_t CursorWindow::clear() {
+     if (mReadOnly) {
+diff --git a/libs/androidfw/include/androidfw/CursorWindow.h b/libs/androidfw/include/androidfw/CursorWindow.h
+index 9ec026a..966e517 100644
+--- a/libs/androidfw/include/androidfw/CursorWindow.h
++++ b/libs/androidfw/include/androidfw/CursorWindow.h
+@@ -22,8 +22,11 @@
+ #include <stdint.h>
+ #include <string>
+ 
++#include "android-base/mapped_file.h"
+ #include "android-base/stringprintf.h"
++#ifdef __linux__
+ #include "binder/Parcel.h"
++#endif
+ #include "utils/String8.h"
+ 
+ #define LOG_WINDOW(...)
+@@ -80,9 +83,11 @@
+     ~CursorWindow();
+ 
+     static status_t create(const String8& name, size_t size, CursorWindow** outCursorWindow);
++#ifdef __linux__
+     static status_t createFromParcel(Parcel* parcel, CursorWindow** outCursorWindow);
+ 
+     status_t writeToParcel(Parcel* parcel);
++#endif
+ 
+     inline String8 name() { return mName; }
+     inline size_t size() { return mSize; }
+@@ -148,6 +153,7 @@
+ private:
+     String8 mName;
+     int mAshmemFd = -1;
++    std::unique_ptr<android::base::MappedFile> mMappedFile = nullptr;
+     void* mData = nullptr;
+     /**
+      * Pointer to the first FieldSlot, used to optimize the extremely
+diff --git a/libs/androidfw/tests/CursorWindow_test.cpp b/libs/androidfw/tests/CursorWindow_test.cpp
+index 3cdb31e..47e198a 100644
+--- a/libs/androidfw/tests/CursorWindow_test.cpp
++++ b/libs/androidfw/tests/CursorWindow_test.cpp
+@@ -257,6 +257,7 @@
+     ASSERT_ALIGNED(w);
+ }
+ 
++#ifdef __linux__
+ TEST(CursorWindowTest, ParcelEmpty) {
+     CREATE_WINDOW_2M;
+ 
+@@ -390,5 +391,6 @@
+     }
+     ASSERT_ALIGNED(w);
+ }
++#endif
+ 
+ } // android

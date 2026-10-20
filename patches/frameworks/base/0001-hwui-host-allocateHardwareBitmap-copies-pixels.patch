@@ -1,0 +1,40 @@
+Bitmap::allocateHardwareBitmap() must copy source content (host builds)
+
+Upstream: platform/frameworks/base commit 30eb173fa2101eee9f229aff5041712e58f906cf
+  "[RNG] Bitmap::allocateHardwareBitmap() must copy source content."
+  Author Raphael Moll, 2024-01-24; committed by John Reck, 2025-04-11.
+  Change-Id Iddb33172ce95f93f76ebe4733cbbd88a04efefe2, Bug 310222823, 242670053.
+  It is the main-branch merge of android12-hostruntime-dev 25874ec and is in
+  android-16.0.0_r3 and later, but not in our pin android-16.0.0_r1.
+Diff fetched unchanged from
+  https://android.googlesource.com/platform/frameworks/base/+/30eb173fa2101eee9f229aff5041712e58f906cf%5E%21/
+
+Why: without it, Bitmap.copy(HARDWARE), HARDWARE decodes (BitmapFactory,
+ImageDecoder, BitmapRegionDecoder) and hardware gainmaps return a zeroed
+heap bitmap on host. The official Robolectric library (BLR2.250402.052)
+copies the pixels: its allocateHardwareBitmap is allocateHeapBitmap(info)
+followed by memcpy(dest pixels, src.getPixels(), src.computeByteSize()),
+which is the android12-hostruntime-dev form of this change. The two agree
+whenever the source has minimal row bytes; readPixels (this commit) also
+handles padded rows, where the memcpy form would overrun the destination.
+
+diff --git a/libs/hwui/hwui/Bitmap.cpp b/libs/hwui/hwui/Bitmap.cpp
+index 0650169..fbf934e 100644
+--- a/libs/hwui/hwui/Bitmap.cpp
++++ b/libs/hwui/hwui/Bitmap.cpp
+@@ -212,7 +212,14 @@
+ #ifdef __ANDROID__  // Layoutlib does not support hardware acceleration
+     return uirenderer::HardwareBitmapUploader::allocateHardwareBitmap(bitmap);
+ #else
+-    return Bitmap::allocateHeapBitmap(bitmap.info());
++    sk_sp<Bitmap> dest = Bitmap::allocateHeapBitmap(bitmap.info());
++
++    // HardwareBitmapUploader::allocateHardwareBitmap(SkBitmap&) copies Bitmap contents
++    // to a GL texture. To simulate this with an heap bitmap, we use memcpy.
++    auto destPM = dest->getSkBitmap().pixmap();
++    LOG_ALWAYS_FATAL_IF(!bitmap.pixmap().readPixels(destPM), "failed to copy pixels");
++
++    return dest;
+ #endif
+ }
+ 

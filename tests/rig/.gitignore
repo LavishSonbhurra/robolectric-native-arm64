@@ -1,0 +1,7 @@
+.gradle/
+.kotlin/
+build/
+.work/
+local.properties
+out/
+*.hprof

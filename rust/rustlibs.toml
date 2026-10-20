@@ -1,0 +1,35 @@
+# Input of tools/bp2rust.py: which Rust goes into librustlibs.a.
+#
+# Soong links Rust into a C++ shared library by compiling every rlib in the
+# library's closure into one staticlib (cc/builder.go GenerateRustStaticlib).
+# We build the same staticlib for libandroid_runtime, but only from the crates
+# that are live in the official library (see docs/NOTES.md, "Rust"). Everything
+# else (crates, flags, features, cfgs, editions, versions) comes from the
+# Android.bp files at the pin.
+
+[staticlib]
+# The cc_library_shared the staticlib is for. Soong passes
+# `-C metadata=<this module>` and checks `-Zallow-features` by its directory.
+for_module = "libandroid_runtime"
+for_module_dir = "frameworks/base/core/jni"
+
+# Rust modules linked by the C++ closure, as Soong sees them: libminikin's
+# `target.linux.whole_static_libs`. Their rustlibs and proc_macros are
+# followed transitively.
+roots = ["libminikin_rust_ffi"]
+
+# Dependencies listed in Android.bp that the host build of the live crates
+# never uses. They are not built, so rustc itself proves the claim: a crate
+# that is referenced but not passed with --extern fails to compile.
+[prune.libminikin_rust_ffi]
+rustlibs = ["libflags_rust"]
+static_libs = ["libflags_rust_cpp_bridge"]
+reason = "flags_rust is only used in hyphenator.rs #[cfg(test)] code"
+
+[prune.libcxx]
+rustlibs = ["libanyhow", "libthiserror"]
+reason = "external/rust/cxx/src does not use anyhow or thiserror"
+
+[prune.liblogger]
+rustlibs = ["libenv_filter"]
+reason = "logger.rs uses env_filter only under #[cfg(target_os = \"android\")]"

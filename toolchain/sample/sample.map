@@ -1,0 +1,6 @@
+{
+  global:
+    sample_*;
+  local:
+    *;
+};

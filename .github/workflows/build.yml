@@ -1,0 +1,399 @@
+# Builds libandroid_runtime.so (SDK 36, AOSP android-16.0.0_r1) for Linux arm64 on the free GitHub
+# arm64 runner, checks it, runs the fidelity rig against it, packages it and attests the result.
+#
+# This workflow has not run on GitHub yet. Its build and test commands are the ones used locally,
+# but expect fixes on the first run on the hosted runner. Numbers in the comments come from the local builds recorded in
+# docs/NOTES.md (a 2-core Ampere Altra (Neoverse-N1) VM with 11 GB RAM) and are estimates for the 4 vCPU / 16 GB / 14 GB runner.
+#
+# Jobs
+#   build      container ubuntu:26.04, about 40 to 60 min cold, about 30 to 40 min with warm caches
+#   rig        host runner, needs build; native arm64 JVM, Gradle, Robolectric 4.17; about 15 to 25 min
+#   package    host runner, needs build and rig; loader jar, checksums, provenance attestation
+#   reproduce  container, needs build; clean rebuild in another path and VM; weekly, on tags and
+#              on demand. Compares the stripped library byte for byte (ci/compare-libs.py).
+#   upstream   optional (manual or tag): Robolectric's own suites, about 25 min
+#
+# Repository settings this workflow relies on (nothing else is referenced):
+#   * Actions are pinned by commit SHA (version in the comment next to each one).
+#   * Artifact attestations need a public repository (or GitHub Enterprise Cloud) and the
+#     permissions already requested below. No secrets are used. GITHUB_TOKEN is enough.
+#   * Publishing (GitHub release, later Maven Central) is not in this file: see docs/DISTRIBUTION.md.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      reproduce:
+        description: "Also run the reproducibility job"
+        type: boolean
+        default: false
+      upstream:
+        description: "Also run Robolectric's upstream suites"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "23 4 * * 1"   # Mondays: reproducibility check and a look at cache health
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Reference build the library must register natives for. Robolectric downloads this jar itself
+  # when the rig runs; the hash pins what the JNI comparison is made against.
+  ANDROID_ALL_VERSION: 16-robolectric-13921718-i7
+  ANDROID_ALL_SHA256: 16f1f751643d1d3d5592008846bbdfc1e57cff15e6ec303d26584de3b6ac25ec
+  PACKAGES: >-
+    clang lld cmake ninja-build python3 patch libc++-21-dev libc++abi-21-dev rustc cargo flex bison
+    git curl xz-utils ca-certificates gnupg gpgv debian-archive-keyring unzip zstd pkg-config
+    llvm binutils
+
+jobs:
+  # ---------------------------------------------------------------------------------------------
+  build:
+    runs-on: ubuntu-24.04-arm            # 4 vCPU, 16 GB RAM, 14 GB disk for public repositories
+    timeout-minutes: 150
+    container:
+      # Pinned by digest (ubuntu:26.04 as of 2026-10-20). apt-get still installs the archive's
+      # current package versions; build-info.txt records the clang, lld and rustc that were used.
+      image: ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944
+    outputs:
+      sha256: ${{ steps.sum.outputs.sha256 }}
+    steps:
+      - name: Install build packages
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends $PACKAGES
+          df -h /
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Mark the workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # Sources: about 0.9 GB extracted, a few hundred MB compressed. tools/fetch.py verifies
+      # every project against config/sources.lock.json (content hash), so a poisoned or stale
+      # cache is detected and re-fetched instead of trusted.
+      - name: Cache AOSP sources
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: src
+          key: aosp-src-${{ hashFiles('config/sources.lock.json', 'config/projects.toml') }}
+          restore-keys: aosp-src-
+
+      # Toolchain downloads: LLVM source tarball (about 140 MB, pinned SHA-256 and signature),
+      # Rust 1.83.0 tarball (237 MB, pinned SHA-256 and signature), Debian 11 snapshot packages
+      # (about 30 MB, locked). The install scripts re-verify what they find.
+      - name: Cache toolchain downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            toolchain/dl
+            rust/toolchain/dl
+            ~/.cargo/registry
+          key: toolchain-dl-${{ hashFiles('toolchain/*.lock.json', 'toolchain/build-runtimes.sh', 'rust/install-toolchain.sh', 'tools/cargo/*.lock') }}
+          restore-keys: toolchain-dl-
+
+      - name: Build
+        run: ci/build.sh -j"$(nproc)" --out dist
+
+      - name: Record sizes
+        run: |
+          df -h /
+          du -sh src build toolchain/out toolchain/dl rust/toolchain ~/.cargo 2>/dev/null || true
+          ls -l dist
+
+      - id: sum
+        run: echo "sha256=$(sha256sum dist/libandroid_runtime.so | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: arm64-library
+          path: |
+            dist/libandroid_runtime.so
+            dist/THIRD_PARTY_NOTICES
+            dist/notices.json
+            dist/build-info.txt
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
+      # The unstripped library is needed by the JNI table comparison in the rig job: the
+      # comparison groups methods into tables by our symbols, which the stripped file lacks.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: arm64-library-unstripped
+          path: |
+            build/out/lib/libandroid_runtime.so
+            dist/libandroid_runtime.so.debug
+          if-no-files-found: error
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------------------------
+  rig:
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arm64-library
+          path: dist
+
+      - name: Verify the downloaded library
+        run: cd dist && sha256sum --check --ignore-missing SHA256SUMS
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"           # SDK 36 needs Java 21 (android-all 16 is class file 65)
+
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+
+      # The action's default packages include the legacy "tools", which has no Linux arm64 build.
+      # The build-tools match what AGP picks by default (the same set works locally on arm64).
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: "platforms;android-36 build-tools;35.0.0"
+          log-accepted-android-sdk-licenses: false
+
+      # AGP's aapt2 is an x86_64 binary and there is no arm64 Linux build of it. Run it under
+      # qemu-user with a small amd64 sysroot (the same one our toolchain script builds, locked and
+      # verified). Not yet tried on the hosted runner; locally the same works with a 17 MB
+      # sysroot. Fallback: apt install libc6-amd64-cross and set QEMU_LD_PREFIX=/usr/x86_64-linux-gnu.
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: amd64
+
+      - name: Build the amd64 sysroot for aapt2
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends gpgv debian-archive-keyring
+          python3 -I toolchain/make-sysroot.py --arch amd64
+          echo "QEMU_LD_PREFIX=$PWD/toolchain/out/sysroot-bullseye-amd64" >> "$GITHUB_ENV"
+
+      - name: Run the fidelity rig on the arm64 library
+        run: |
+          ./gradlew --no-daemon -p tests/rig :app:testDebugUnitTest \
+            -Prig.java="$JAVA_HOME/bin/java" \
+            -Prig.out="$PWD/out/arm64" \
+            -Prig.nativeLib="$PWD/dist/libandroid_runtime.so"
+
+      - name: Compare against the x86_64 goldens
+        run: |
+          sudo apt-get install -y --no-install-recommends python3-pil
+          python3 tests/rig/scripts/compare.py tests/rig/goldens/x86_64 out/arm64 \
+            --diff-dir out/arm64/_diff --json out/arm64/_report.json || true   # tolerance is the baseline, below
+          python3 -I ci/check-baseline.py out/arm64/_report.json --baseline tests/rig/baseline/arm64.json
+
+      - name: Check which library was loaded
+        run: |
+          grep -q 'loader=robolectricarm64.LinuxArm64NativeRuntimeLoader' out/arm64/_loader.txt
+          grep -q "loadedFrom=$PWD/dist/libandroid_runtime.so" out/arm64/_loader.txt
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arm64-library-unstripped
+          path: unstripped
+
+      # JNI registration tables and exported symbols against the official library. The official
+      # library is extracted from the jar Robolectric just downloaded; it is used here and
+      # nowhere else, never uploaded or cached.
+      - name: JNI tables and exports against the official library
+        run: |
+          jar=$(ls ~/.m2/repository/org/robolectric/android-all-instrumented/${ANDROID_ALL_VERSION}/*.jar | head -1)
+          echo "${ANDROID_ALL_SHA256}  ${jar}" | sha256sum --check -
+          mkdir -p ref && unzip -qo -j "$jar" native/linux/x86_64/libandroid_runtime.so -d ref
+          python3 -I tools/jni_tables.py compare ref/libandroid_runtime.so unstripped/build/out/lib/libandroid_runtime.so > jni-compare.txt || true
+          cat jni-compare.txt
+          diff -u ci/expected-jni-compare.txt jni-compare.txt     # only the known differences are allowed
+          python3 -I tools/jni_tables.py dynsym ref/libandroid_runtime.so dist/libandroid_runtime.so
+          rm -rf ref
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: rig-output
+          path: |
+            out/arm64
+            tests/rig/app/build/reports
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------------------------
+  package:
+    needs: [build, rig]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write          # artifact attestations
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arm64-library
+          path: dist
+
+      - run: cd dist && sha256sum --check --ignore-missing SHA256SUMS
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+
+      # Picks up dist/THIRD_PARTY_NOTICES next to the library as META-INF/THIRD_PARTY_NOTICES.
+      - name: Build the loader jar with the library inside
+        run: |
+          ./gradlew --no-daemon :loader:jar -Pra64.nativeLib="$PWD/dist/libandroid_runtime.so"
+          mkdir -p release
+          cp loader/build/libs/*.jar release/
+          cp dist/libandroid_runtime.so dist/THIRD_PARTY_NOTICES dist/notices.json dist/build-info.txt release/
+          cd release && sha256sum * > SHA256SUMS && cat SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            release/libandroid_runtime.so
+            release/*.jar
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: release
+          retention-days: 90
+
+      # Publishing is a separate workflow (release.yml, not written yet): a tag push (v*) creates
+      # the GitHub release from this artifact; Maven Central publishing comes later and needs the
+      # signing key and portal token as secrets. This workflow uses no secrets.
+
+  # ---------------------------------------------------------------------------------------------
+  # Rebuild from scratch on another VM, in another directory, with another -j, no caches, and
+  # compare the stripped library byte for byte. See docs/reproducibility.md for what is expected
+  # to match. Until this has passed once, the claim is "not yet known to be reproducible".
+  reproduce:
+    needs: build
+    if: github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v') || inputs.reproduce
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 150
+    container:
+      image: ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944   # same image as the build job
+    steps:
+      - run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends $PACKAGES diffoscope-minimal
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arm64-library
+          path: first
+
+      # Different path and a different -j from the first build. No cache restore: this job fetches
+      # and builds everything again (the fetch is verified by the lock file anyway).
+      - name: Rebuild in another directory
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          mkdir -p /opt/ra64-second
+          git archive HEAD | tar -x -C /opt/ra64-second
+          cd /opt/ra64-second
+          ci/build.sh -j3 --out "$GITHUB_WORKSPACE/second"
+
+      # The build maps the checkout and build directories out of the debug info, so the two
+      # stripped libraries must be byte-identical, build-id included. compare-libs.py exits 3
+      # when only the build-id differs (a path leaking into the debug info again): that fails too.
+      - name: Compare
+        id: cmp
+        run: |
+          set -e
+          sha256sum first/libandroid_runtime.so second/libandroid_runtime.so
+          grep -E 'build_id|clang|rustc' first/build-info.txt second/build-info.txt
+          cmp first/THIRD_PARTY_NOTICES second/THIRD_PARTY_NOTICES
+          python3 -I ci/compare-libs.py first/libandroid_runtime.so second/libandroid_runtime.so
+
+      - name: Explain the difference
+        if: failure() && steps.cmp.outcome == 'failure'
+        run: diffoscope --text diffoscope.txt first/libandroid_runtime.so second/libandroid_runtime.so || true
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: reproducibility-report
+          path: |
+            diffoscope.txt
+            second/SHA256SUMS
+            second/build-info.txt
+
+  # ---------------------------------------------------------------------------------------------
+  upstream:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.upstream
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arm64-library
+          path: dist
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: "platforms;android-36 build-tools;35.0.0"
+          log-accepted-android-sdk-licenses: false
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: amd64
+      - run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends gpgv debian-archive-keyring
+          python3 -I toolchain/make-sysroot.py --arch amd64
+          echo "QEMU_LD_PREFIX=$PWD/toolchain/out/sysroot-bullseye-amd64" >> "$GITHUB_ENV"
+
+      # Clones robolectric at the tag, runs robotests, nativegraphics and ctesque at SDK 36 with
+      # -Drobolectric.enabledSdks=36 and the loader plugin injected by an init script
+      # (tests/upstream/scripts/arm64.init.gradle.kts). 262 to 614 s wall on a 2-core Ampere Altra VM, 3 GB heap.
+      - name: Run the upstream suites
+        run: |
+          ARM64_LIB="$PWD/dist/libandroid_runtime.so" tests/upstream/scripts/run.sh arm64 ci \
+            -Psuite.heap=3g :robotests:test :nativegraphics:testDebugUnitTest :ctesque:testDebugUnitTest || true
+
+      - name: Compare failures with the known list
+        run: python3 -I ci/check-upstream-failures.py tests/upstream/results/ci/junit --expected ci/upstream-expected-failures.txt
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: upstream-junit
+          path: tests/upstream/results/ci
+          retention-days: 14

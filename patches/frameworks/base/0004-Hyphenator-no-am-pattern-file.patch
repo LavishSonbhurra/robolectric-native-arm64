@@ -1,0 +1,33 @@
+Hyphenator: do not load the missing "am" pattern file
+
+Upstream: platform/frameworks/base commit 67ed6fce130422fa70c33b8822b30c7644fc10ef
+  "Remove call to `addHyphenator("am", 1, 1)`"
+  Author Michael Hoisie, 2025-08-05; committed 2025-08-06.
+  Change-Id I8ae35baff1d2c4996a48d8b614361b20c252a108, Bug 436377626.
+  First tagged in android-16.0.0_r4 (not in r1, r2 or r3).
+Diff fetched unchanged from
+  https://android.googlesource.com/platform/frameworks/base/+/67ed6fce130422fa70c33b8822b30c7644fc10ef%5E%21/
+
+Why: the official library (BLR2.250402.052) has it. In its Hyphenator
+init() the short-string constants passed to addHyphenator go "af"
+(movw $0x6661), "as" ($0x7361), "be" ($0x6562) with no "am" ($0x6d61) in
+between; the only "am" left is the later addHyphenatorAlias("am",
+"und-Ethi"). Our r1 build has "am" in both places. hyph-am.hyb does not
+exist, so r1 only logs "Unable to find pattern file or unable to map it
+for am" at every Hyphenator init; with the change that error is gone and
+Amharic still resolves through the und-Ethi alias.
+
+diff --git a/core/jni/android_text_Hyphenator.cpp b/core/jni/android_text_Hyphenator.cpp
+index e45cbaf..d9abe26 100644
+--- a/core/jni/android_text_Hyphenator.cpp
++++ b/core/jni/android_text_Hyphenator.cpp
+@@ -127,8 +127,7 @@
+     constexpr int INDIC_MIN_PREFIX = 2;
+     constexpr int INDIC_MIN_SUFFIX = 2;
+ 
+-    addHyphenator("af", 1, 1);  // Afrikaans
+-    addHyphenator("am", 1, 1);  // Amharic
++    addHyphenator("af", 1, 1);                                // Afrikaans
+     addHyphenator("as", INDIC_MIN_PREFIX, INDIC_MIN_SUFFIX);  // Assamese
+     addHyphenator("be", 2, 2);  // Belarusian
+     addHyphenator("bg", 2, 2);  // Bulgarian

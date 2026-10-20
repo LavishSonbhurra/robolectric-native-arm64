@@ -1,0 +1,91 @@
+# Input of tools/gen_notices.py for what Android.bp does not describe.
+#
+# [[component]]: linked code from outside the AOSP tree (toolchain, sysroot).
+#   archives / objects: the files it is linked from (globs). After the link a
+#     component is listed when one of its archives had a member extracted or
+#     one of its objects was an input; every linked archive and object must
+#     belong to a module or to one of these.
+#   files: licence texts.
+#   Placeholders: {sysroot} (toolchain/make-sysroot.py), {runtimes}
+#   (toolchain/build-runtimes.sh), {rust_toolchain} (rust/install-toolchain.sh),
+#   {rustlibs} (librustlibs.a). Check the names and versions here whenever a
+#   pin in those scripts changes.
+# [[supplement]]: more texts for an AOSP licence module, by its name; paths
+#   are relative to src/.
+# [[attribution]]: a sentence a licence requires in the documentation, printed
+#   at the top of the NOTICE file when that component is in the library.
+
+[[component]]
+id = "llvm-libcxx"
+name = "LLVM libc++, libc++abi and libunwind 21.1.8"
+what = "static C++ standard library, C++ ABI library and unwinder (libc++.a contains all three)"
+origin = "llvm-project 21.1.8"
+spdx = ["Apache-2.0 WITH LLVM-exception"]
+archives = ["{runtimes}/lib/libc++.a", "{runtimes}/lib/libc++abi.a", "{runtimes}/lib/libunwind.a"]
+files = ["{runtimes}/share/licenses/libcxx/LICENSE.TXT",
+         "{runtimes}/share/licenses/libcxxabi/LICENSE.TXT",
+         "{runtimes}/share/licenses/libunwind/LICENSE.TXT"]
+
+[[component]]
+id = "llvm-compiler-rt-ubsan-minimal"
+name = "LLVM compiler-rt UBSan minimal runtime 21.1.8"
+what = "libclang_rt.ubsan_minimal"
+origin = "llvm-project 21.1.8"
+spdx = ["Apache-2.0 WITH LLVM-exception"]
+archives = ["{runtimes}/lib/linux/libclang_rt.ubsan_minimal-*.a"]
+files = ["{runtimes}/share/licenses/compiler-rt/LICENSE.TXT"]
+
+[[component]]
+id = "libgcc"
+name = "GCC 10 runtime (Debian 11 libgcc-10-dev 10.2.1-6)"
+what = "crtbeginS.o, crtendS.o and libgcc.a (-static-libgcc)"
+origin = "Debian bullseye gcc-10"
+spdx = ["GPL-3.0-or-later WITH GCC-exception-3.1"]
+archives = ["{sysroot}/usr/lib/gcc/*/10/libgcc.a", "{sysroot}/usr/lib/gcc/*/10/libgcc_eh.a"]
+objects = ["{sysroot}/usr/lib/gcc/*/10/crt*.o"]
+files = ["{sysroot}/usr/share/doc/libgcc-10-dev/copyright", "{sysroot}/usr/share/common-licenses/GPL-3"]
+note = "The GCC Runtime Library Exception 3.1 (in the text) permits linking this code into the library under its own terms."
+
+[[component]]
+id = "glibc"
+name = "GNU C Library 2.31 (Debian 11 libc6-dev 2.31-13+deb11u11)"
+what = "crti.o, crtn.o and libc_nonshared.a (fstat, pthread_atfork); glibc itself is linked dynamically"
+origin = "Debian bullseye glibc"
+spdx = ["LGPL-2.1-or-later"]
+archives = ["{sysroot}/usr/lib/*/libc_nonshared.a"]
+objects = ["{sysroot}/usr/lib/*/crt[in].o"]
+files = ["{sysroot}/usr/share/doc/libc6-dev/copyright", "{sysroot}/usr/share/common-licenses/LGPL-2.1"]
+
+[[component]]
+id = "rust-std"
+name = "Rust standard library 1.83.0 and its dependencies"
+what = "std, core, alloc, panic_unwind, compiler_builtins and their crates (addr2line, gimli, miniz_oxide, rustc-demangle, hashbrown, object, memchr, ...) in librustlibs.a"
+origin = "rust-lang/rust 1.83.0"
+spdx = ["MIT OR Apache-2.0"]
+archives = ["{rustlibs}"]
+files = ["{rust_toolchain}/share/doc/rust/COPYRIGHT",
+         "{rust_toolchain}/share/doc/rust/LICENSE-APACHE",
+         "{rust_toolchain}/share/doc/rust/LICENSE-MIT"]
+
+[[supplement]]
+license = "external_libjpeg-turbo_license"
+files = ["external/libjpeg-turbo/README.ijg"]
+reason = "The IJG licence terms; Android.bp does not list the file as license_text."
+
+[[attribution]]
+license = "external_dng_sdk_license"
+text = "This product includes DNG technology under license by Adobe Systems Incorporated."
+
+[[attribution]]
+license = "adobe_hdr_gain_map_license"
+text = "This product includes Gain Map technology under license by Adobe."
+
+[[attribution]]
+license = "external_libjpeg-turbo_license"
+text = "This software is based in part on the work of the Independent JPEG Group."
+
+[[attribution]]
+license = "external_freetype_license"
+text = """This software is based in part on the work of the FreeType Team.
+Portions of this software are copyright (c) 2023 The FreeType Project (www.freetype.org).
+All rights reserved."""
