@@ -26,13 +26,13 @@ Robolectric project. "Android" is a trademark of Google LLC.
   later). Java 21 is required by SDK 36.
 * Not covered: SDK 34 and below (a different native library built by a different recipe), SDK 37.
   SDK 35 is untested.
-* Nothing has been released yet. The first release will be a GitHub release, cut once the CI workflow
-  has run on GitHub's arm64 runners; publishing to Maven Central comes after that. All results below
-  come from local builds.
+* Released on GitHub:
+  [v4.17-16-robolectric-13921718-1](https://github.com/LavishSonbhurra/robolectric-native-arm64/releases/tag/v4.17-16-robolectric-13921718-1),
+  built and attested by CI on GitHub's arm64 runners. Publishing to Maven Central comes later.
 
 ## Quick start
 
-Coordinates of the first release:
+Coordinates:
 
 | | |
 | --- | --- |
