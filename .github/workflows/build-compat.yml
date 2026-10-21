@@ -53,9 +53,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # The official x86_64 library the JNI tables and exports are compared against. Robolectric
-  # downloads this jar itself when the rig runs.
+  # The official x86_64 library the JNI tables and exports are compared against.
   DIST_COMPAT_VERSION: "1.0.19"
+  DIST_COMPAT_SHA256: "33e0a0982b3ba599763af250b86eb8d67ab6c186c2fa2c5e823ee003bdcd4ed8"
   PACKAGES: >-
     clang lld cmake ninja-build python3 patch flex bison
     git curl xz-utils ca-certificates gnupg gpgv debian-archive-keyring unzip zstd pkg-config
@@ -175,12 +175,15 @@ jobs:
           grep -q "loadedFrom=$PWD/dist-compat/librobolectric-nativeruntime.so" $out/_loader.txt
 
       # JNI tables (76 tables, 906 methods) and exports against the official library, taken
-      # from the nativeruntime-dist-compat jar Robolectric downloaded. Used here only.
+      # from the nativeruntime-dist-compat jar on Maven Central (pinned by SHA-256). Used here only.
       - name: JNI tables and exports against the official library
         if: matrix.sdk == 30
         run: |
-          jar=$(ls ~/.m2/repository/org/robolectric/nativeruntime-dist-compat/${DIST_COMPAT_VERSION}/*.jar | head -1)
-          mkdir -p ref && unzip -qo -j "$jar" native/linux/x86_64/librobolectric-nativeruntime.so -d ref
+          mkdir -p ref
+          curl -fsSL --retry 3 -o ref/dist-compat.jar \
+            "https://repo1.maven.org/maven2/org/robolectric/nativeruntime-dist-compat/${DIST_COMPAT_VERSION}/nativeruntime-dist-compat-${DIST_COMPAT_VERSION}.jar"
+          echo "${DIST_COMPAT_SHA256}  ref/dist-compat.jar" | sha256sum --check
+          unzip -qo -j ref/dist-compat.jar native/linux/x86_64/librobolectric-nativeruntime.so -d ref
           python3 -I tools/jni_tables.py compare ref/librobolectric-nativeruntime.so \
             dist-compat/librobolectric-nativeruntime.so > jni-compare.txt || true
           cat jni-compare.txt
