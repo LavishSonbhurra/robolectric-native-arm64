@@ -30,8 +30,9 @@ Robolectric project. "Android" is a trademark of Google LLC.
   `robolectric-nativeruntime-compat-linux-aarch64-x86pixels`, renders exactly like the x86_64 library
   under qemu. See [docs/COMPAT.md](docs/COMPAT.md). Not covered: SDK 37. SDK 35 is untested.
 * Released on GitHub:
-  [v4.17-16-robolectric-13921718-1](https://github.com/LavishSonbhurra/robolectric-native-arm64/releases/tag/v4.17-16-robolectric-13921718-1),
-  built and attested by CI on GitHub's arm64 runners. Publishing to Maven Central comes later.
+  [v4.17-16-robolectric-13921718-2](https://github.com/LavishSonbhurra/robolectric-native-arm64/releases/tag/v4.17-16-robolectric-13921718-2)
+  (loader `-2` with the SDK 36 library, and the two compat jars `1.0.19-1`), built and attested by CI
+  on GitHub's arm64 runners. Publishing to Maven Central comes later.
 
 ## Quick start
 
@@ -41,7 +42,7 @@ Coordinates:
 | --- | --- |
 | Group | `io.github.lavishsonbhurra` |
 | Artifact | `robolectric-nativeruntime-linux-aarch64` |
-| Version | `4.17-16-robolectric-13921718-1` (Robolectric, android-all build, revision) |
+| Version | `4.17-16-robolectric-13921718-2` (Robolectric, android-all build, revision) |
 
 Until the artifact is on Maven Central, download the jar from the
 [GitHub releases](https://github.com/LavishSonbhurra/robolectric-native-arm64/releases) and use it as a
@@ -51,11 +52,13 @@ file dependency.
 dependencies {
     testImplementation("org.robolectric:robolectric:4.17")
     // Inert on every platform except Linux aarch64.
-    testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-linux-aarch64:4.17-16-robolectric-13921718-1")
-    // Only for tests at SDK 26 to 34 (needs loader 4.17-16-robolectric-13921718-2 or later). For
-    // x86-identical pixels use robolectric-nativeruntime-compat-linux-aarch64-x86pixels instead:
-    // testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-compat-linux-aarch64:1.0.19-1")
-    // Before Maven Central: testRuntimeOnly(files("libs/robolectric-nativeruntime-linux-aarch64-4.17-16-robolectric-13921718-1.jar"))
+    testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-linux-aarch64:4.17-16-robolectric-13921718-2")
+    // For tests at SDK 26 to 34. For x86-identical pixels use
+    // robolectric-nativeruntime-compat-linux-aarch64-x86pixels instead.
+    testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-compat-linux-aarch64:1.0.19-1")
+    // Before Maven Central, use the release jars as files:
+    // testRuntimeOnly(files("libs/robolectric-nativeruntime-linux-aarch64-4.17-16-robolectric-13921718-2.jar"))
+    // testRuntimeOnly(files("libs/robolectric-nativeruntime-compat-linux-aarch64-1.0.19-1.jar"))
 }
 
 tasks.withType<Test>().configureEach {
