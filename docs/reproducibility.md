@@ -64,6 +64,32 @@ Optional quick check (not in the workflow): generate the CMake files twice with 
 `PYTHONHASHSEED` values and different build directories and diff `cmake-gen/` after replacing the
 directory names. This catches ordering bugs in `bp2cmake.py` in a minute without compiling anything.
 
+## The compat library (SDK 34 and below)
+
+`librobolectric-nativeruntime.so` is built with the same flags, maps and pins, but it is reproducible
+bit for bit only when it is built at the same checkout path. The CI `reproduce` job in
+`build-compat.yml` therefore rebuilds on a clean runner with no caches, in the same container and the
+same workspace path as the `build` job, and fails on any byte of difference.
+
+The cause is a clang bug, not our flags. clang names a conversion operator whose type is a closure
+(`operator (lambda at FILE:LINE:COL)`) without applying `-ffile-prefix-map`, while every other lambda
+name in the debug info is remapped. Ten such names come from three harfbuzz headers
+(`hb-ot-layout-gsubgpos.hh`, `hb-ot-layout-gsub-table.hh`, `hb-aat-layout-feat-table.hh`) and keep the
+absolute path of the checkout. The first CI run on a different path (2026-10-21) differed in those
+`.debug_str` entries only; in the stripped library that changes the 20 build-id bytes and the 4-byte
+`.gnu_debuglink` CRC: 24 bytes in total, which was the whole difference.
+
+Workarounds that were tried and rejected:
+
+* `-g0` for harfbuzz removes the names, but it also changed generated code: `normalize_glyphs_cluster`
+  came out 4 bytes longer and later functions moved. A debug-only fix must not change code, so it was
+  dropped.
+* A fixed alias path for the source tree (a symlink at the same absolute path on every machine) would
+  work, but it breaks concurrent builds on one machine and hides the problem rather than fixing it.
+
+To reproduce a published compat library yourself, build in the `ubuntu:26.04` container from the
+workflow with the checkout at `/__w/robolectric-native-arm64/robolectric-native-arm64`.
+
 ## What would still not be reproduced
 
 * A build on another Ubuntu release or with a different clang package revision.

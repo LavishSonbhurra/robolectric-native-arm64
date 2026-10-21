@@ -141,7 +141,9 @@ Details, including the audit of later AOSP host fixes, are in [docs/NOTES.md](do
 * **Reproducible with the same compiler packages.** A local build and two CI builds in different
   directories gave the same stripped library, byte for byte. The CI image is pinned by digest, but the
   clang and lld package revisions come from the Ubuntu archive at build time, so a later package update
-  can change the output ([docs/reproducibility.md](docs/reproducibility.md)).
+  can change the output ([docs/reproducibility.md](docs/reproducibility.md)). The SDK 34 and below
+  library is reproducible byte for byte only when built at the same checkout path: a clang bug leaves
+  the path in ten harfbuzz debug names, which changes the build-id (the code is the same).
 * **Architecture details.** `char` is unsigned and `long double` is IEEE binary128 on aarch64. SQLite may
   round a text-to-real conversion near the precision limit differently from the x86_64 library.
 

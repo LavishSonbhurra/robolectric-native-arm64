@@ -309,13 +309,13 @@ jobs:
         with:
           name: arm64-compat-library-${{ matrix.pixels }}
           path: first
-      - name: Rebuild in another directory
+      # Same checkout path as the build job, on a fresh runner with no caches. Unlike the SDK 36
+      # library, this one is reproducible only at the same path: clang leaves the path in ten
+      # harfbuzz debug names (docs/reproducibility.md, "The compat library").
+      - name: Rebuild on a clean runner
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
-          mkdir -p /opt/ra64-second
-          git archive HEAD | tar -x -C /opt/ra64-second
-          cd /opt/ra64-second
           ci/build-compat.sh -j3 --out "$GITHUB_WORKSPACE/second" --pixels ${{ matrix.pixels }}
       - name: Compare
         id: cmp
