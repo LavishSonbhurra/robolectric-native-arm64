@@ -20,6 +20,14 @@
 #                               -Drobolectric.arm64.nativeLibrary
 #   RIG_LOADER_JAR              arm64 mode: put this prebuilt loader jar on the test classpath
 #                               instead of the :loader project (tests the release artifact)
+#   RIG_COMPAT_JAR              arm64 mode: also put these compat jars (comma-separated) on the
+#                               test classpath (the SDK <= 34 library as a resource; leave
+#                               RIG_ARM64_LIB unset)
+#   RIG_COMPAT_PIXELS           native or x86: which compat jar the loader takes if both are there
+#   RIG_SDK                     SDK level to run (default 36). Below 35 the SDK <= 34 compat
+#                               library (librobolectric-nativeruntime) is used: x86-via-loader
+#                               then defaults to the official one from nativeruntime-dist-compat,
+#                               and RIG_ARM64_LIB / RIG_X86_LIB name such a file
 #   RA64_NATIVE_LIB             read by the :loader project: bundle this library into its jar
 #   RIG_X86_LIB                 x86-via-loader: x86_64 library to load (default: the official
 #                               one, unpacked from android-all in the local Maven repository)
@@ -63,13 +71,36 @@ x86_lib() {
   echo "$dir/libandroid_runtime.so"
 }
 
-args=()
+# The official x86_64 compat library (SDK <= 34), from nativeruntime-dist-compat.
+x86_compat_lib() {
+  local dir="$ROOT/.work/x86lib-compat" jar
+  if [ ! -f "$dir/librobolectric-nativeruntime.so" ]; then
+    jar=$(ls "$HOME"/.gradle/caches/modules-2/files-2.1/org.robolectric/nativeruntime-dist-compat/1.0.19/*/nativeruntime-dist-compat-1.0.19.jar 2>/dev/null | head -1)
+    [ -n "$jar" ] || { echo "nativeruntime-dist-compat 1.0.19 not in the Gradle cache" >&2; exit 2; }
+    mkdir -p "$dir"
+    unzip -qo -j "$jar" native/linux/x86_64/librobolectric-nativeruntime.so -d "$dir"
+  fi
+  echo "$dir/librobolectric-nativeruntime.so"
+}
+
+SDK="${RIG_SDK:-36}"
+args=("-Prig.sdk=$SDK")
+if [ "$SDK" -lt 35 ]; then
+  args+=("-Prig.nativeLibSdk=$SDK")
+  x86_lib() { x86_compat_lib; }
+fi
 case "$MODE" in
   golden-x86)     java="$X64_JDK/bin/java"; args+=(-Prig.stock) ;;
   x86-via-loader) java="$X64_JDK/bin/java"; args+=("-Prig.nativeLib=${RIG_X86_LIB:-$(x86_lib)}") ;;
   arm64)          java="$ARM64_JDK/bin/java"
                   [ -n "${RIG_ARM64_LIB:-}" ] && args+=("-Prig.nativeLib=$RIG_ARM64_LIB")
-                  [ -n "${RIG_LOADER_JAR:-}" ] && args+=("-Prig.loaderJar=$(realpath "$RIG_LOADER_JAR")") ;;
+                  [ -n "${RIG_LOADER_JAR:-}" ] && args+=("-Prig.loaderJar=$(realpath "$RIG_LOADER_JAR")")
+                  if [ -n "${RIG_COMPAT_JAR:-}" ]; then
+                    jars=(); IFS=, read -ra list <<< "$RIG_COMPAT_JAR"
+                    for j in "${list[@]}"; do jars+=("$(realpath "$j")"); done
+                    args+=("-Prig.compatJar=$(IFS=,; echo "${jars[*]}")")
+                  fi
+                  [ -n "${RIG_COMPAT_PIXELS:-}" ] && args+=("-Prig.compatPixels=$RIG_COMPAT_PIXELS") ;;
   *) echo "usage: scripts/run.sh golden-x86|x86-via-loader|arm64 [gradle args]" >&2; exit 2 ;;
 esac
 [ -x "$java" ] || { echo "missing Java 21 at $java (set RIG_ARM64_JDK or RIG_X64_JDK)" >&2; exit 2; }

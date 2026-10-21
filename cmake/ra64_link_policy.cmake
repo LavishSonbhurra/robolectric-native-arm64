@@ -34,6 +34,21 @@ function(ra64_apply_shared_link_policy target)
     message(FATAL_ERROR "ra64_apply_shared_link_policy needs -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-sysroot.cmake")
   endif()
   set(_rt "${RA64_RUNTIMES}/lib")
+  if(RA64_CXX_RUNTIME STREQUAL "closure")
+    # The C++ library is a module of the AOSP tree, linked as part of the
+    # static closure (compat target: Android 12 external/libcxx with
+    # libc++abi, Soong's libc++_static). Like Soong's Android 12 host link:
+    # libgcc's unwinder (-static-libgcc: libgcc.a + libgcc_eh.a, the
+    # reference's local _Unwind_* symbols), and libc++'s symbols stay
+    # exported (no version script; the reference exports them too).
+    target_link_options(${target} PRIVATE
+      -fuse-ld=lld
+      -nostdlib++ -static-libgcc
+      -Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now
+      -Wl,--no-undefined -Wl,--no-undefined-version
+      -Wl,--build-id=sha1
+      -Wl,--exclude-libs,libgcc.a -Wl,--exclude-libs,libgcc_eh.a)
+  else()
   target_link_options(${target} PRIVATE
     -fuse-ld=lld
     -nostdlib++ -static-libgcc --unwindlib=none
@@ -45,6 +60,7 @@ function(ra64_apply_shared_link_policy target)
     # Keep the static C++ runtime and libgcc out of the dynamic symbol table
     # even if a version script pattern is too wide.
     -Wl,--exclude-libs,libc++.a -Wl,--exclude-libs,libgcc.a -Wl,--exclude-libs,libgcc_eh.a)
+  endif()
   if(P_VERSION_SCRIPT)
     get_filename_component(_vs "${P_VERSION_SCRIPT}" ABSOLUTE)
     target_link_options(${target} PRIVATE "-Wl,--version-script,${_vs}")
@@ -52,7 +68,11 @@ function(ra64_apply_shared_link_policy target)
   endif()
   # Soong's host order: the C++ runtime after everything else, then
   # -ldl -lpthread -lm -lrt (cc/linker.go), libc from the driver.
-  target_link_libraries(${target} PRIVATE "${_rt}/libc++.a" -ldl -lpthread -lm -lrt)
+  if(RA64_CXX_RUNTIME STREQUAL "closure")
+    target_link_libraries(${target} PRIVATE -ldl -lpthread -lm -lrt)
+  else()
+    target_link_libraries(${target} PRIVATE "${_rt}/libc++.a" -ldl -lpthread -lm -lrt)
+  endif()
   set_target_properties(${target} PROPERTIES
     LINKER_LANGUAGE CXX
     SKIP_BUILD_RPATH TRUE

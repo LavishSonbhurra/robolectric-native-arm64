@@ -1,0 +1,12 @@
+# Extra notices for RA64_PIXELS=x86 (cmake/notices.cmake adds this file in that
+# mode). SIMDe is header-only: its code is compiled into the objects of libskia,
+# libhwui and librobolectric-nativeruntime.
+
+[[component]]
+id = "simde"
+name = "SIMDe 0.8.2"
+what = "x86 SSE intrinsics in portable C (header-only), used by the optional x86 pixel mode"
+origin = "https://github.com/simd-everywhere/simde v0.8.2 (commit 71fd833d9666141edcd1d3c109a80e228303d8d7)"
+spdx = ["MIT"]
+headers = true
+files = ["{src}/third_party/simde/COPYING"]

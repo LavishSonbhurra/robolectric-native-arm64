@@ -53,6 +53,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import android.graphics.RuntimeShader
+import android.os.Build
 import androidx.compose.runtime.remember
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawBehind
@@ -102,7 +103,7 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = SCREEN)
+@Config(sdk = [Config.ALL_SDKS], qualifiers = SCREEN)
 class ComposeScenesTest {
     @Suppress("DEPRECATION")
     @get:Rule
@@ -190,12 +191,21 @@ class ComposeScenesTest {
                 Box(Modifier.size(90.dp).blur(6.dp).background(Brush.verticalGradient(listOf(Color.Black, Color(0xFF00BCD4)))))
                 Box(Modifier.size(90.dp).graphicsLayer { rotationX = 30f; cameraDistance = 8f * density }.background(Color(0xFF9C27B0)))
             }
-            // AGSL needs the hardware renderer; the window PixelCopy goes through it.
-            val agsl = remember { RuntimeShader(AGSL) }
-            Box(Modifier.fillMaxWidth().height(90.dp).drawBehind {
-                agsl.setFloatUniform("size", size.width, size.height)
-                drawRect(ShaderBrush(agsl))
-            })
+            // AGSL needs the hardware renderer; the window PixelCopy goes through it. RuntimeShader
+            // is API 33 (there is no AGSL before Android 13); below it the box keeps its place
+            // in the layout with a plain gradient, so the rest of the scene is the same.
+            if (Build.VERSION.SDK_INT >= 33) {
+                val agsl = remember { RuntimeShader(AGSL) }
+                Box(Modifier.fillMaxWidth().height(90.dp).drawBehind {
+                    // The array setter: at SDK 33 and 34 Robolectric 4.17 drops the scalar ones
+                    // (ShadowNativeRuntimeShader no-ops them) and the uniform stays uninitialised.
+                    agsl.setFloatUniform("size", floatArrayOf(size.width, size.height))
+                    drawRect(ShaderBrush(agsl))
+                })
+            } else {
+                Box(Modifier.fillMaxWidth().height(90.dp).background(
+                    Brush.horizontalGradient(listOf(Color(0xFF3F51B5), Color(0xFFE91E63)))))
+            }
             Surface(tonalElevation = 6.dp, shadowElevation = 6.dp, shape = RoundedCornerShape(24.dp)) {
                 Text("Surface with tonal and shadow elevation", Modifier.padding(16.dp))
             }

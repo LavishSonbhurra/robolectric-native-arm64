@@ -1,0 +1,153 @@
+{
+ "_comment": "Ceilings for the SDK <= 34 compat library built with RA64_PIXELS=x86 at SDK 30 against tests/rig/goldens/x86_64-sdk30 (rendered with the official x86_64 library under qemu). The x86 pixel mode matches the goldens exactly, so every ceiling is 0. Clean build of 2026-10-21; see docs/COMPAT.md.",
+ "images": {
+  "bitmap-configs.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "bitmap-decode-bitmapfactory.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "bitmap-decode-imagedecoder.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "bitmap-decode-options.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "bitmap-encode-roundtrip.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "bitmap-scaling-filters.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "canvas-blend-modes.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "canvas-blur-shadow.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "canvas-color-filters.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "canvas-gradients.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "canvas-layers-picture.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "canvas-path-effects.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "canvas-paths.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "canvas-shaders.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "canvas-shapes-aa.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "canvas-strokes.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "canvas-transforms-clips.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "canvas-vertices-mesh.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "compose-graphics.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "compose-lazy-list-roborazzi-node.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "compose-lazy-list-roborazzi-screen.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "compose-lazy-list.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "compose-material-dark.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "compose-material-light.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "compose-text.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "text-effects.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "text-emoji.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "text-font-families.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "text-hyphenation.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "text-metrics.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "text-rtl-bidi.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "text-scripts.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "text-sizes.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "view-dark-pixelcopy.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "view-dark-software.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "view-light-pixelcopy.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  },
+  "view-light-software.png": {
+   "max_delta": 0,
+   "differing_pixels": 0
+  }
+ }
+}

@@ -177,7 +177,8 @@ def main():
     ap.add_argument("--closure", required=True, help="cmake-gen/closure.json")
     ap.add_argument("--module", default="libandroid_runtime", help="the linked library's module")
     ap.add_argument("--rust-crates", help="rustlibs/crates.tsv (bp2rust)")
-    ap.add_argument("--extra", required=True)
+    ap.add_argument("--extra", required=True, action="append",
+                    help="notices-extra.toml (repeatable; the tables are concatenated)")
     ap.add_argument("--policy", required=True)
     ap.add_argument("--var", action="append", default=[], metavar="NAME=PATH")
     ap.add_argument("--archives", help="TSV: module, archive path, for the module archives on the link line")
@@ -198,7 +199,7 @@ def main():
         if p:
             vars_[k] = os.path.abspath(p)
     problems = []
-    read_files = {os.path.abspath(x) for x in (a.closure, a.extra, a.policy, a.rust_crates, a.archives) if x}
+    read_files = {os.path.abspath(x) for x in (a.closure, a.policy, a.rust_crates, a.archives, *a.extra) if x}
 
     closure = json.load(open(a.closure))
     root = closure.get(a.module)
@@ -206,7 +207,10 @@ def main():
         sys.exit(f"gen_notices: {a.module} is not in {a.closure}")
     link = root.get("link") or {}
     line_modules = [a.module] + list(link.get("static_libs", []))
-    extra_cfg = tomllib.load(open(a.extra, "rb"))
+    extra_cfg = {}
+    for e in a.extra:
+        for k, v in tomllib.load(open(e, "rb")).items():
+            extra_cfg.setdefault(k, []).extend(v)
     policy = tomllib.load(open(a.policy, "rb"))
     allowed = set(policy.get("allowed_kinds", []))
     acked = {x["id"]: x["reason"] for x in policy.get("acknowledged", [])}
@@ -358,7 +362,9 @@ def main():
             matched_objects |= ohits
             # Without the dependency file, components that contribute objects
             # directly are kept: their inclusion cannot be checked.
-            used = hits or ohits or (linked_objects is None and obj_pats)
+            # `headers = true`: header-only code compiled into the library's
+            # own objects (no archive of its own); listed whenever configured.
+            used = hits or ohits or (linked_objects is None and obj_pats) or x.get("headers")
             if not used:
                 skipped.append(x["id"])
                 continue

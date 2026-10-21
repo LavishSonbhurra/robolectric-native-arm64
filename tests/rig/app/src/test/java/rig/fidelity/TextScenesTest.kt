@@ -30,7 +30,7 @@ import org.robolectric.annotation.GraphicsMode
 /** Fonts, sizes, scripts, RTL, emoji, hyphenation and line breaking, text effects. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = SCREEN)
+@Config(sdk = [Config.ALL_SDKS], qualifiers = SCREEN)
 class TextScenesTest {
     private fun tp(size: Float, tf: Typeface? = null, color: Int = Color.BLACK) = TextPaint().apply {
         isAntiAlias = true

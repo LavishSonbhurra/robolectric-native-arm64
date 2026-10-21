@@ -14,7 +14,8 @@ run (aidl, aidl-cpp, aprotoc, sysprop_cpp) are taken from DIR (the bin/
 directory of a native build of the same tree) instead of being built.
 
 Inputs: src/ (fetched by tools/fetch.py), config/aosp.toml,
-overrides/overrides.toml. Output: DIR/modules.cmake plus one response file
+overrides/overrides.toml (with RA64_TARGET=compat: src-compat/ and
+config/compat/, see tools/target.py). Output: DIR/modules.cmake plus one response file
 per (module, language) under DIR/rsp/, holding the exact compiler flags in
 Soong's order (response files keep CMake from de-duplicating or reordering
 them).
@@ -34,9 +35,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import blueprint as bp  # noqa: E402
 import release_config  # noqa: E402
 import soong_flags  # noqa: E402
+import target  # noqa: E402
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "src")
+ROOT = target.ROOT
+SRC = target.SRC
 
 
 class GenError(Exception):
@@ -56,18 +58,36 @@ ARCHES = ("arm64", "x86_64")
 
 
 class Config:
-    def __init__(self, arch=None):
-        self.aosp = load_toml(os.path.join(ROOT, "config", "aosp.toml"))
-        self.ov = load_toml(os.path.join(ROOT, "overrides", "overrides.toml"))
+    def __init__(self, arch=None, pixels=None):
+        self.aosp = load_toml(target.AOSP_TOML)
+        self.ov = load_toml(target.OVERRIDES)
         self.os = self.aosp["variant"]["os"]
         # config/aosp.toml holds the default; RA64_ARCH (CMake) overrides it.
         self.arch = arch or self.aosp["variant"]["arch"]
         if self.arch not in ARCHES:
             raise GenError(f"unsupported arch {self.arch} (have {', '.join(ARCHES)})")
         self.host_tools_dir = None
-        self.release = release_config.ReleaseConfig(
-            os.path.join(SRC, "build", "release"), self.aosp["release"]["config"],
-            self.aosp["release"].get("variant", ""))
+        # Pixel mode (RA64_PIXELS, compat target): a [pixels.<mode>] table of
+        # module overrides in the overrides file. "native" or unset: none.
+        self.pixels = None
+        mode = pixels or "native"
+        modes = self.ov.get("pixels", {})
+        if mode != "native":
+            if mode not in modes:
+                raise GenError(f"pixel mode {mode} not in overrides [pixels] (have native"
+                               f"{''.join(', ' + m for m in modes)})")
+            self.pixels = mode
+        soong_flags.use_profile(self.aosp["variant"].get("soong"))
+        self.stl_module = self.ov.get("toolchain", {}).get("stl_module")
+        if self.stl_module:
+            soong_flags.STL_CPPFLAGS = ["-nostdinc++"]
+        if "release" in self.aosp:
+            self.release = release_config.ReleaseConfig(
+                os.path.join(SRC, "build", "release"), self.aosp["release"]["config"],
+                self.aosp["release"].get("variant", ""))
+        else:
+            # Trees older than build/release (Android 12): no release flags.
+            self.release = release_config.NoReleaseConfig()
         self.warned = set()
 
     def warn(self, msg):
@@ -99,7 +119,33 @@ class Config:
         return self._resolve_value(tbl[name])
 
     def module_override(self, name):
-        return self.ov.get("module", {}).get(name, {})
+        base = self.ov.get("module", {}).get(name, {})
+        if not self.pixels:
+            return base
+        # [pixels.<mode>.module.<name>]: appended to the module's own override
+        # (props lists are concatenated, per-arch tables merged).
+        extra = self.ov["pixels"][self.pixels].get("module", {}).get(name)
+        if not extra:
+            return base
+        out = copy.deepcopy(base)
+
+        # {src} and {config} in pixel-mode strings: the target's source and
+        # config directories (for -isystem paths).
+        def sub(x):
+            if isinstance(x, str):
+                return x.replace("{src}", target.SRC).replace("{config}", target.CONFIG)
+            return x
+
+        def merge(dst, src):
+            for k, v in src.items():
+                if isinstance(v, dict):
+                    merge(dst.setdefault(k, {}), v)
+                elif isinstance(v, list):
+                    dst[k] = list(dst.get(k, [])) + [sub(x) for x in v]
+                else:
+                    dst[k] = v
+        merge(out, extra)
+        return out
 
 
 class SelectCtx(bp.SelectContext):
@@ -584,6 +630,18 @@ class Generator:
         ov = self.cfg.module_override(name)
         if ov.get("props"):
             append_props(props, ov["props"], prepend_keys=set())
+        # Per-architecture tweaks: [module.<name>.arch.<arch>] with `props`
+        # (appended) and `remove_cflags` (exact flags taken out of cflags,
+        # e.g. an x86-only -m flag that a target stanza adds for every CPU).
+        aov = ov.get("arch", {}).get(self.cfg.arch, {})
+        if aov.get("props"):
+            append_props(props, aov["props"], prepend_keys=set())
+        if aov.get("remove_cflags"):
+            rm = set(aov["remove_cflags"])
+            missing = rm - set(props.get("cflags", []))
+            if missing:
+                self.err(f"{name}: remove_cflags {sorted(missing)} not in its cflags")
+            props["cflags"] = [f for f in props.get("cflags", []) if f not in rm]
         c.headers_only = name in self.headers_only or kind == "headers"
         # link_only: none of the module's own sources or generated code is
         # built; its exported include dirs are used and its whole_static_libs
@@ -614,6 +672,17 @@ class Generator:
         c.whole_static_libs = L("whole_static_libs")
         c.static_libs = [x for x in L("static_libs") if x not in excl_static]
         c.shared_libs = [x for x in L("shared_libs") if x not in excl_shared and x not in SKIP_SHARED]
+        # [toolchain] stl_module: the C++ library is an Android.bp module of
+        # the tree (Android 12: external/libcxx libc++_static, which
+        # whole-links libc++abi), as cc/stl.go makes it: every module with
+        # the default stl gets it as a static dependency (its exported
+        # headers, and the archive at the shared library link), and
+        # -nostdinc++ (soong_flags.STL_CPPFLAGS). Without it, the toolchain's
+        # libc++ is used (SDK 36).
+        stlm = self.cfg.stl_module
+        if stlm and props.get("stl") != "none" and kind != "headers" and name != stlm \
+                and stlm not in c.static_libs:
+            c.static_libs.append(stlm)
         if mtype == "cc_aconfig_library" and props.get("mode", "production") != "force-read-only":
             # Added by CcAconfigLibraryCallbacks.GeneratorDeps.
             c.shared_libs += ["libaconfig_storage_read_api_cc", "libbase", "liblog"]
@@ -993,6 +1062,48 @@ def link_closure(gen, name):
     return out
 
 
+def soong_topological_order(gen, root, libs):
+    """Soong's link order of a shared library's static dependencies
+    (cc.go orderStaticModuleDeps, Android 12): the depset of
+    TransitiveStaticLibrariesForOrdering, TOPOLOGICAL order, i.e. a
+    postorder walk with each library's dependency list reversed, made
+    unique (first occurrence) and then reversed, so every library comes
+    before the libraries it depends on. When several archives define the
+    same symbol, this decides which definition the linker takes. A library's
+    whole_static_libs are part of its own archive in Soong; ours are
+    separate archives placed right after it. `libs` is link_closure()'s
+    result; entries it has that the walk does not reach keep their
+    relative order at the end."""
+    cc = [d for k, d in libs if k == "cc"]
+    want = set(cc)
+    seen = set()
+    post = []
+
+    def node(n):
+        c = gen.cc[n]
+        return [d for d in c.static_libs if gen.is_cc(d)]
+
+    def dfs(n):
+        seen.add(n)
+        for d in reversed(node(n)):
+            if d not in seen:
+                dfs(d)
+        post.append(n)
+
+    for d in reversed(node(root)):
+        if d not in seen:
+            dfs(d)
+    order = []
+    for n in reversed(post):
+        group = [n] + [w for w in gen.cc[n].whole_static_libs if gen.is_cc(w)]
+        for g in group:
+            if g in want and g not in order:
+                order.append(g)
+    order += [d for d in cc if d not in order]
+    it = iter(order)
+    return [("cc", next(it)) if k == "cc" else (k, d) for k, d in libs]
+
+
 def emit(gen, order, out_dir):
     lines = ["# Generated by tools/bp2cmake.py. Do not edit.", ""]
     rsp_dir = os.path.join(out_dir, "rsp")
@@ -1102,6 +1213,8 @@ def emit_shared_link(gen, c, t, manifest):
     the C++ runtime, the UBSan minimal runtime and the Rust staticlib as
     CMake-level inputs the toolchain and rust tracks can replace."""
     libs = link_closure(gen, c.name)
+    if gen.cfg.ov.get("toolchain", {}).get("link_order") == "soong-topological":
+        libs = soong_topological_order(gen, c.name, libs)
     items = []
     rust = []
     for kind, d in libs:
@@ -1177,11 +1290,12 @@ def main():
     ap.add_argument("--cmake-command", default="cmake")
     ap.add_argument("--arch", choices=ARCHES, help="default: config/aosp.toml [variant] arch")
     ap.add_argument("--host-tools-dir", help="native host tools for a cross build (bin/ of a native build)")
+    ap.add_argument("--pixels", default=None, help="pixel mode (overrides [pixels.<mode>]); default native")
     ap.add_argument("--root", action="append", default=[])
     ap.add_argument("--explain", action="append", default=[],
                     help="print the resolved properties and flags of a module")
     args = ap.parse_args()
-    cfg = Config(args.arch)
+    cfg = Config(args.arch, args.pixels)
     if args.host_tools_dir:
         cfg.host_tools_dir = os.path.abspath(args.host_tools_dir)
     roots = args.root or cfg.ov.get("closure", {}).get("roots", [])

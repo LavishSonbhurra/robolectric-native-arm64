@@ -1,0 +1,147 @@
+# AOSP projects for the compat target (RA64_TARGET=compat), by checkout path.
+# Same format as config/projects.toml.
+
+[[project]]
+path = "build/soong"
+subdirs = ["cc/config", "licenses"]
+# Reference only (tools/soong_flags_s.py mirrors them): flag assembly order,
+# sanitizer, STL and linker defaults of this Soong.
+files = ["cc/compiler.go", "cc/builder.go", "cc/sanitize.go", "cc/stl.go", "cc/linker.go",
+         "cc/library.go", "cc/cc.go", "cc/strip.go", "cc/lto.go", "cc/pgo.go"]
+
+[[project]]
+path = "frameworks/base"
+subdirs = ["libs/hwui", "libs/androidfw", "libs/hostgraphics", "core/jni", "media/jni"]
+files = ["Android.bp"]
+
+[[project]]
+path = "frameworks/native"
+subdirs = ["include", "headers", "opengl/include", "libs/ui", "libs/nativebase", "libs/nativedisplay",
+           "libs/nativewindow", "libs/arect", "libs/math",
+           # headers only: include/gui is a symlink into libs/gui/include/gui
+           # (hwui RenderNode.cpp includes gui/TraceUtils.h through it).
+           "libs/gui/include",
+           # headers only, same way: include/binder -> libs/binder/include/binder
+           # (hwui hwui/Bitmap.cpp includes binder/IServiceManager.h, uses nothing).
+           "libs/binder/include"]
+files = ["Android.bp"]
+
+[[project]]
+path = "frameworks/minikin"
+
+[[project]]
+path = "frameworks/av"
+subdirs = ["include"]
+
+[[project]]
+path = "system/core"
+subdirs = ["include", "libcutils", "libutils", "libsystem", "libprocessgroup", "libvndksupport"]
+
+[[project]]
+path = "system/libbase"
+
+[[project]]
+path = "system/logging"
+subdirs = ["liblog"]
+
+[[project]]
+path = "system/libziparchive"
+
+[[project]]
+path = "system/incremental_delivery"
+
+[[project]]
+path = "system/media"
+subdirs = ["audio/include", "camera/include", "private/camera/include"]
+
+[[project]]
+path = "libnativehelper"
+
+[[project]]
+path = "hardware/libhardware"
+subdirs = ["include"]
+files = ["Android.bp"]
+
+[[project]]
+path = "external/skia"
+subdirs = ["include", "src", "modules", "third_party", "client_utils", "linux", "tools"]
+files = ["Android.bp", "BUILD.gn", "LICENSE"]
+
+[[project]]
+path = "external/harfbuzz_ng"
+
+[[project]]
+path = "external/freetype"
+
+[[project]]
+path = "external/libpng"
+
+[[project]]
+path = "external/zlib"
+
+[[project]]
+path = "external/libjpeg-turbo"
+
+[[project]]
+path = "external/webp"
+
+[[project]]
+path = "external/expat"
+
+[[project]]
+path = "external/dng_sdk"
+
+[[project]]
+path = "external/piex"
+
+[[project]]
+path = "external/vulkan-headers"
+
+[[project]]
+path = "external/icu"
+subdirs = ["icu4c", "libandroidicu", "libandroidicuinit", "libicu", "android_icu4c", "build"]
+files = ["Android.bp"]
+
+[[project]]
+path = "external/sqlite"
+
+[[project]]
+path = "bionic"
+subdirs = ["libc/kernel"]
+files = ["libc/Android.bp", "linker/Android.bp",
+         # AOSP's clang ships these as its builtin stdatomic.h (overrides [toolchain]).
+         "libc/include/stdatomic.h", "libc/include/bits/stdatomic.h"]
+
+[[project]]
+path = "external/fmtlib"
+
+[[project]]
+path = "system/unwinding"
+subdirs = ["libbacktrace"]
+
+[[project]]
+path = "external/googletest"
+subdirs = ["googletest"]
+files = ["Android.bp"]
+
+[[project]]
+path = "external/sfntly"
+
+# Android 12's own libc++ and libc++abi (Soong's libc++_static for hosts).
+[[project]]
+path = "external/libcxx"
+
+[[project]]
+path = "external/libcxxabi"
+
+# Not AOSP: release tarballs, pinned by sha256 (tools/fetch.py fetch_archive).
+
+# SIMDe (MIT, https://github.com/simd-everywhere/simde), only for the optional
+# RA64_PIXELS=x86 mode: x86 SSE intrinsics in portable C, so arm64 can run
+# Skia's x86 code paths. v0.8.2 = commit 71fd833d9666141edcd1d3c109a80e228303d8d7.
+[[archive]]
+path = "third_party/simde"
+url = "https://github.com/simd-everywhere/simde/archive/refs/tags/v0.8.2.tar.gz"
+sha256 = "ed2a3268658f2f2a9b5367628a85ccd4cf9516460ed8604eed369653d49b25fb"
+strip = 1
+keep = ["simde", "COPYING", "README.md"]

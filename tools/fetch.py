@@ -3,7 +3,8 @@
 
 Reads config/aosp.toml (the pin) and config/projects.toml (which projects,
 and optionally which sub-directories of them), resolves every project to a
-commit through Gitiles, downloads per-project (or per-directory) tarballs,
+commit through Gitiles (the commit the manifest tag points at, or, with a
+`superproject` pin, the commit the superproject records for the project), downloads per-project (or per-directory) tarballs,
 extracts them under src/<path>, verifies them against config/sources.lock.json
 and applies patches/<path>/*.patch in name order.
 
@@ -17,6 +18,9 @@ Usage:
   tools/fetch.py              fetch what is missing or stale, verify the rest
   tools/fetch.py --update-lock   record new hashes instead of failing on change
   tools/fetch.py --only PATH  restrict to one project path (repeatable)
+
+RA64_TARGET=compat switches every path to the SDK <= 34 compat target
+(config/compat/, src-compat/; see tools/target.py).
 
 Only the Python standard library is used. Tarballs are cached in
 src/.cache/tarballs and single files in src/.cache/files, so re-extracting
@@ -39,11 +43,14 @@ import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "src")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import target  # noqa: E402
+
+ROOT = target.ROOT
+SRC = target.SRC
 CACHE = os.path.join(SRC, ".cache")
 STAMPS = os.path.join(SRC, ".stamps")
-LOCK = os.path.join(ROOT, "config", "sources.lock.json")
+LOCK = target.LOCK
 
 
 # Top-level files of a project that carry licence terms or licence metadata.
@@ -57,9 +64,38 @@ def is_license_file(name):
     return any(n.startswith(p) for p in LICENSE_FILE_PREFIXES)
 
 
-def load_toml(name):
-    with open(os.path.join(ROOT, "config", name), "rb") as f:
+def load_toml(path):
+    with open(path, "rb") as f:
         return tomllib.load(f)
+
+
+def pin_name(cfg):
+    """What the lock file was resolved for: the manifest tag, or the
+    superproject commit (with the manifest commit that names the projects)."""
+    a = cfg["aosp"]
+    if "superproject" in a:
+        return f"superproject:{a['superproject']}"
+    return a["tag"]
+
+
+def superproject_commit(cfg, path):
+    """The commit the pinned superproject records for `path` (a gitlink),
+    read from the Gitiles listing of its parent directory (cached)."""
+    a = cfg["aosp"]
+    parent, leaf = os.path.split(path)
+    cp = os.path.join(CACHE, "superproject", a["superproject"], (parent or ".").replace("/", "__") + ".json")
+    if not os.path.exists(cp):
+        tree = gitiles_json(f"{a['gitiles']}/platform/superproject/+/{a['superproject']}/{parent}?format=JSON")
+        os.makedirs(os.path.dirname(cp), exist_ok=True)
+        with open(cp + ".tmp", "w") as f:
+            json.dump(tree, f)
+        os.replace(cp + ".tmp", cp)
+    with open(cp) as f:
+        tree = json.load(f)
+    for e in tree.get("entries", []):
+        if e["name"] == leaf and e.get("type") == "commit":
+            return e["id"]
+    raise SystemExit(f"{path}: no gitlink in superproject {a['superproject']}")
 
 
 def http_get(url, tries=6):
@@ -85,9 +121,11 @@ def gitiles_json(url):
 
 
 def manifest(cfg):
-    path = os.path.join(CACHE, f"manifest-{cfg['aosp']['tag']}.xml")
+    a = cfg["aosp"]
+    ref = a["manifest"] if "manifest" in a else f"refs/tags/{a['tag']}"
+    path = os.path.join(CACHE, f"manifest-{ref.rsplit('/', 1)[-1]}.xml")
     if not os.path.exists(path):
-        url = f"{cfg['aosp']['gitiles']}/platform/manifest/+/refs/tags/{cfg['aosp']['tag']}/default.xml?format=TEXT"
+        url = f"{a['gitiles']}/platform/manifest/+/{ref}/default.xml?format=TEXT"
         os.makedirs(CACHE, exist_ok=True)
         with open(path, "wb") as f:
             f.write(base64.b64decode(http_get(url)))
@@ -166,7 +204,7 @@ def tree_hash(top):
 
 
 def patch_files(path):
-    d = os.path.join(ROOT, "patches", path)
+    d = os.path.join(target.PATCHES, path)
     if not os.path.isdir(d):
         return []
     return [os.path.join(d, f) for f in sorted(os.listdir(d)) if f.endswith(".patch")]
@@ -198,15 +236,19 @@ def extract(blob, dest, final_dest):
 def fetch_project(cfg, proj, mf, lock, update_lock):
     path = proj["path"]
     if path not in mf:
-        raise SystemExit(f"{path}: not in the manifest for {cfg['aosp']['tag']}")
+        raise SystemExit(f"{path}: not in the manifest for {pin_name(cfg)}")
     name, rev = mf[path]
+    if "superproject" in cfg["aosp"]:
+        rev = f"{rev}@superproject:{cfg['aosp']['superproject']}"
     base = cfg["aosp"]["gitiles"]
     subdirs = proj.get("subdirs", [])
     files = proj.get("files", [])
     entry = lock.get(path)
 
     commit = entry["commit"] if entry and entry.get("rev") == rev else None
-    if commit is None:
+    if commit is None and "superproject" in cfg["aosp"]:
+        commit = superproject_commit(cfg, path)
+    elif commit is None:
         commit = gitiles_json(f"{base}/{name}/+/{rev}?format=JSON")["commit"]
 
     # Licence files at the top of a project fetched in parts. The whole-project
@@ -313,23 +355,78 @@ def fetch_project(cfg, proj, mf, lock, update_lock):
     return True
 
 
+def fetch_archive(arc, lock):
+    """An [[archive]] entry of projects.toml: a release tarball from outside
+    AOSP (url + sha256), extracted under src/<path>. `strip` drops leading
+    path components, `keep` limits extraction to those top-level entries."""
+    path = arc["path"]
+    strip = int(arc.get("strip", 1))
+    keep = arc.get("keep", [])
+    want_stamp = {"url": arc["url"], "sha256": arc["sha256"], "strip": strip, "keep": keep}
+    stamp_path = os.path.join(STAMPS, path.replace("/", "__") + ".json")
+    dest = os.path.join(SRC, path)
+    entry = lock.get(path)
+    if os.path.exists(stamp_path) and os.path.isdir(dest) and entry:
+        with open(stamp_path) as f:
+            if json.load(f) == want_stamp:
+                return False
+    print(f"fetch {path} ({arc['url']})", flush=True)
+    tdir = os.path.join(CACHE, "tarballs")
+    os.makedirs(tdir, exist_ok=True)
+    cp = os.path.join(tdir, "archive__" + path.replace("/", "__") + "__" + arc["sha256"][:16] + ".tar.gz")
+    if not os.path.exists(cp):
+        blob = http_get(arc["url"])
+        with open(cp + ".tmp", "wb") as f:
+            f.write(blob)
+        os.rename(cp + ".tmp", cp)
+    if file_sha(cp) != arc["sha256"]:
+        os.unlink(cp)
+        raise SystemExit(f"{path}: {arc['url']} does not match the pinned sha256")
+    tmp = dest + ".partial"
+    shutil.rmtree(tmp, ignore_errors=True)
+    os.makedirs(tmp)
+    with tarfile.open(cp) as tf:
+        members = []
+        for m in tf.getmembers():
+            parts = m.name.split("/")[strip:]
+            if not parts or not parts[0] or (keep and parts[0] not in keep):
+                continue
+            m.name = "/".join(parts)
+            members.append(m)
+        tf.extractall(tmp, members=members, filter="data")
+    th = tree_hash(tmp)
+    new_entry = {"url": arc["url"], "sha256": arc["sha256"], "tree_sha256": th}
+    if entry and entry.get("tree_sha256") not in (None, th) and entry.get("sha256") == arc["sha256"]:
+        raise SystemExit(f"{path}: content hash mismatch against the lock file")
+    lock[path] = new_entry
+    shutil.rmtree(dest, ignore_errors=True)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    os.rename(tmp, dest)
+    os.makedirs(STAMPS, exist_ok=True)
+    with open(stamp_path, "w") as f:
+        json.dump(want_stamp, f, indent=1)
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--update-lock", action="store_true")
     ap.add_argument("--only", action="append", default=[])
     args = ap.parse_args()
 
-    cfg = load_toml("aosp.toml")
-    projects = load_toml("projects.toml")["project"]
+    cfg = load_toml(target.AOSP_TOML)
+    ptoml = load_toml(target.PROJECTS_TOML)
+    projects = ptoml["project"]
+    archives = ptoml.get("archive", [])
     mf = manifest(cfg)
     lock = {}
     if os.path.exists(LOCK):
         with open(LOCK) as f:
             lock = json.load(f)
-        if lock.get("_tag") != cfg["aosp"]["tag"]:
-            print(f"lock file is for {lock.get('_tag')}, re-resolving for {cfg['aosp']['tag']}")
+        if lock.get("_tag") != pin_name(cfg):
+            print(f"lock file is for {lock.get('_tag')}, re-resolving for {pin_name(cfg)}")
             lock = {}
-    lock["_tag"] = cfg["aosp"]["tag"]
+    lock["_tag"] = pin_name(cfg)
 
     changed = 0
     try:
@@ -338,8 +435,13 @@ def main():
                 continue
             if fetch_project(cfg, proj, mf, lock, args.update_lock):
                 changed += 1
+        for arc in archives:
+            if args.only and arc["path"] not in args.only:
+                continue
+            if fetch_archive(arc, lock):
+                changed += 1
     finally:
-        wanted = {p["path"] for p in projects}
+        wanted = {p["path"] for p in projects} | {a["path"] for a in archives}
         if not args.only:
             for k in [k for k in lock if not k.startswith("_") and k not in wanted]:
                 del lock[k]

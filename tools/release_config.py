@@ -73,6 +73,21 @@ def _value(v):
     return ""
 
 
+class NoReleaseConfig:
+    """For trees that predate build/release (Android 12): no flags, no
+    aconfig value sets."""
+
+    name = None
+    decls = {}
+    flags = {}
+    value_sets = []
+    chain = []
+    variant_applied = None
+
+    def flag(self, name):
+        return None
+
+
 class ReleaseConfig:
     def __init__(self, release_dir, name, variant=""):
         self.dir = release_dir

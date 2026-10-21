@@ -108,6 +108,12 @@ COMMON_GLOBAL_INCLUDES = [
 
 WARNING_ALLOWED_PROJECTS = ("device/", "vendor/")
 
+# Behaviour switches (Android 16 values). tools/soong_flags_s.py changes them
+# for Android 12 trees, see use_profile().
+HOST_RTTI_FLAG = True        # cc/compiler.go: -frtti/-fno-rtti on every toolchain
+WERROR_PREFIX = ["-Werror"]  # prepended when a module has neither -Werror nor -Wno-error
+DEBUG_IN_COMMON = False      # "-g" comes from debug_flags(), not COMMON_GLOBAL_CFLAGS
+
 # ---- cc/config/clang.go ----------------------------------------------------
 
 CLANG_UNKNOWN_CFLAGS = {
@@ -173,7 +179,28 @@ if os.environ.get("RA64_LIBCXX_INCLUDE"):
     STL_CPPFLAGS = ["-nostdinc++", "-isystem", os.environ["RA64_LIBCXX_INCLUDE"]]
 
 
+PROFILES = ("android16", "android12")
+
+
+def use_profile(name):
+    """Switch the global flag tables to another Soong version: "android16"
+    (the tables above) or "android12" (tools/soong_flags_s.py)."""
+    if name in (None, "", "android16"):
+        return
+    if name != "android12":
+        raise ValueError(f"unknown Soong flag profile {name} (have {', '.join(PROFILES)})")
+    import soong_flags_s
+    g = globals()
+    for k, v in vars(soong_flags_s).items():
+        if k.isupper():
+            if k not in g:
+                raise ValueError(f"soong_flags_s.{k} does not replace anything in soong_flags")
+            g[k] = v
+
+
 def debug_flags():
+    if DEBUG_IN_COMMON:
+        return []
     # Soong: "-g" unless CLANG_DEFAULT_DEBUG_LEVEL says otherwise.
     lvl = os.environ.get("AOSP_DEBUG_LEVEL", "g")
     return ["-g"] if lvl == "g" else ["-g" + lvl]
@@ -388,7 +415,7 @@ def module_flags(gen, c):
     if c.srcs:
         if "-Wno-error" not in cflags + cppflags and "-Werror" not in cflags + cppflags:
             if not c.dir.startswith(WARNING_ALLOWED_PROJECTS):
-                cflags = ["-Werror"] + cflags
+                cflags = WERROR_PREFIX + cflags
 
     def std(v, default, experimental):
         if not v:
@@ -404,7 +431,8 @@ def module_flags(gen, c):
         cpp_std = cpp_std.replace("gnu", "c")
     conlyflags = ["-std=" + c_std] + conlyflags
     cppflags = ["-std=" + cpp_std] + cppflags
-    cppflags.append("-frtti" if c.rtti else "-fno-rtti")
+    if HOST_RTTI_FLAG:
+        cppflags.append("-frtti" if c.rtti else "-fno-rtti")
     # Sanitizer flags are Local.CFlags appended after the compiler's own (and
     # after -Werror is prepended), so they follow the module cflags.
     cflags += san_flags

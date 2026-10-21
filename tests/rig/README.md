@@ -95,9 +95,12 @@ Environment variables, all optional:
 | `RIG_ARM64_JDK`, `RIG_X64_JDK` | Java 21 homes for the test JVM (default `.work/jdk/aarch64`, `.work/jdk/x64`). |
 | `RIG_ARM64_LIB` | `arm64`: load this `libandroid_runtime.so` through `-Drobolectric.arm64.nativeLibrary`. |
 | `RIG_LOADER_JAR` | `arm64`: put this prebuilt loader jar on the test classpath instead of the `:loader` project. Use it to test the release jar, library bundled. |
+| `RIG_COMPAT_JAR` | `arm64`: also put these compat jars (comma-separated) on the test classpath, for SDK 34 and below. Use it with `RIG_LOADER_JAR` and without `RIG_ARM64_LIB` to test the release jars. |
+| `RIG_COMPAT_PIXELS` | `arm64`: `native` or `x86`, which compat jar the loader takes when both are on the classpath. |
 | `RA64_NATIVE_LIB` | Read by the `:loader` project: bundle this library into its jar for the run, so it is loaded as a classpath resource. |
 | `RIG_X86_LIB` | `x86-via-loader`: the x86_64 library to load (default: the official one, unpacked from android-all into `.work/x86lib/`). |
 | `RIG_M2_REPO` | The local Maven repository Robolectric downloads android-all into (default `$HOME/.m2/repository`). |
+| `RIG_SDK` | SDK level to run (default 36). Below 35 the SDK <= 34 compat library is used, and the goldens are `goldens/x86_64-sdk<N>`. |
 | `RIG_OUT_NAME` | Output directory name under `out/` (default: the mode). |
 | `GRADLE` | Gradle command (default `../../gradlew`). |
 | `GRADLE_JAVA_HOME` | JDK that runs Gradle itself (default: `JAVA_HOME` as set). |

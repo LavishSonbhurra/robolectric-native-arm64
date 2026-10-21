@@ -19,7 +19,7 @@ import org.robolectric.nativeruntime.DefaultNativeRuntimeLoader
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36])
+@Config(sdk = [Config.ALL_SDKS])
 class LoaderProbeTest {
     @Test
     fun recordLoader() {

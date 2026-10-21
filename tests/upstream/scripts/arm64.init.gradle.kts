@@ -12,6 +12,8 @@
 val props = gradle.startParameter.projectProperties
 val loaderJar = props["arm64.loaderJar"] ?: error("set -Parm64.loaderJar=/abs/path/loader.jar")
 val nativeLibrary = props["arm64.nativeLibrary"]
+// 34 when nativeLibrary is the SDK <= 34 library (librobolectric-nativeruntime.so).
+val nativeLibrarySdk = props["arm64.nativeLibrarySdk"]
 
 gradle.allprojects {
     val p = this
@@ -20,5 +22,6 @@ gradle.allprojects {
     }
     tasks.withType<Test>().configureEach {
         if (nativeLibrary != null) systemProperty("robolectric.arm64.nativeLibrary", nativeLibrary)
+        if (nativeLibrarySdk != null) systemProperty("robolectric.arm64.nativeLibrarySdk", nativeLibrarySdk)
     }
 }

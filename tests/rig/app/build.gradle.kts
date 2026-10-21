@@ -43,6 +43,13 @@ kotlin {
  *                 the release jar with the library bundled)
  *   rig.heap      test JVM heap (default 1280m)
  *   rig.tmp       java.io.tmpdir for the test JVM (default .work/tmp, on disk)
+ *   rig.sdk       SDK level to run (default 36; tests say sdk = ALL_SDKS, this filters)
+ *   rig.nativeLibSdk SDK level rig.nativeLib was built for (default 36; below 35 means the
+ *                 SDK <= 34 compat library, librobolectric-nativeruntime)
+ *   rig.compatJar also put these compat jars (comma-separated; the SDK <= 34 library as a
+ *                 classpath resource) on the test classpath (tests the release artifacts; leave
+ *                 rig.nativeLib unset)
+ *   rig.compatPixels native or x86: which compat jar the loader takes when both are present
  */
 fun configureRig(test: Test) {
     val p = providers
@@ -67,6 +74,9 @@ fun configureRig(test: Test) {
     test.systemProperty("roborazzi.test.record", "true")
     test.systemProperty("rig.out.dir", p.gradleProperty("rig.out").getOrElse(layout.buildDirectory.dir("rig-out").get().asFile.path))
     p.gradleProperty("rig.nativeLib").orNull?.let { test.systemProperty("robolectric.arm64.nativeLibrary", it) }
+    test.systemProperty("robolectric.enabledSdks", p.gradleProperty("rig.sdk").getOrElse("36"))
+    p.gradleProperty("rig.nativeLibSdk").orNull?.let { test.systemProperty("robolectric.arm64.nativeLibrarySdk", it) }
+    p.gradleProperty("rig.compatPixels").orNull?.let { test.systemProperty("robolectric.arm64.compatPixels", it) }
     test.testLogging {
         events("passed", "skipped", "failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
@@ -100,6 +110,9 @@ dependencies {
         } else {
             // The library is bundled only if ra64.nativeLib or RA64_NATIVE_LIB is set.
             testRuntimeOnly(project(":loader"))
+        }
+        providers.gradleProperty("rig.compatJar").orNull?.let { jars ->
+            testRuntimeOnly(files(jars.split(',').filter { it.isNotBlank() }))
         }
     }
 }

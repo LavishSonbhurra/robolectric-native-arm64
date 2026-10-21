@@ -3,6 +3,7 @@ package rig.fidelity
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
+import android.os.Build
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ImageDecoder
@@ -20,7 +21,7 @@ import org.robolectric.annotation.GraphicsMode
 /** Bitmap scaling filters, decoders (PNG, JPEG, WebP), encoders and pixel configs. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = SCREEN)
+@Config(sdk = [Config.ALL_SDKS], qualifiers = SCREEN)
 class BitmapScenesTest {
     private fun bytes(name: String): ByteArray =
         checkNotNull(javaClass.classLoader!!.getResourceAsStream("images/$name")) { "missing images/$name" }.readBytes()
@@ -98,7 +99,14 @@ class BitmapScenesTest {
         val scaled = decode("photo-rgba.png", BitmapFactory.Options().apply { inDensity = 160; inTargetDensity = 240; inScaled = true })
         drawBitmap(scaled, 100f, 140f, null)
         val large = bytes("photo-large.jpg")
-        val region = BitmapRegionDecoder.newInstance(large, 0, large.size)!!
+        // newInstance(byte[], int, int) is API 31; below it, the API level's own overload
+        // (isShareable is ignored since API 21) reaches the same native region decoder.
+        val region = if (Build.VERSION.SDK_INT >= 31) {
+            BitmapRegionDecoder.newInstance(large, 0, large.size)
+        } else {
+            @Suppress("DEPRECATION")
+            BitmapRegionDecoder.newInstance(large, 0, large.size, false)
+        }!!
         val part = region.decodeRegion(Rect(150, 60, 330, 200), BitmapFactory.Options().apply { inSampleSize = 1 })
         drawBitmap(part, 200f, 0f, null)
         val half = region.decodeRegion(Rect(0, 0, 384, 256), BitmapFactory.Options().apply { inSampleSize = 2 })

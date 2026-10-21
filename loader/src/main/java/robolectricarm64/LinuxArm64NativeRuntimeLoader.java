@@ -44,7 +44,8 @@ import org.robolectric.util.TempDirectory;
 
 /**
  * A {@link org.robolectric.pluginapi.NativeRuntimeLoader} that lets Robolectric 4.17 load a
- * Linux arm64 build of libandroid_runtime for SDK 35 and above.
+ * Linux arm64 build of libandroid_runtime for SDK 35 and above, and of
+ * librobolectric-nativeruntime (the nativeruntime-dist-compat library) for SDK 26 to 34.
  *
  * <p>Robolectric picks its NativeRuntimeLoader through ServiceLoader and keeps the candidate
  * with the highest {@code @Priority}. The stock {@link DefaultNativeRuntimeLoader} declares
@@ -59,8 +60,11 @@ import org.robolectric.util.TempDirectory;
  *       x86_64 library.
  *   <li>Otherwise, on Linux aarch64, the classpath resource {@value #ARM64_RESOURCE} is used
  *       (from android-all itself once upstream ships it, or from any jar on the test classpath).
- *   <li>Everywhere else, and for SDK levels below 35, it hands over to the stock loader
- *       unchanged.
+ *   <li>For SDK levels below 35 on Linux aarch64, the compat library from the classpath:
+ *       {@value #ARM64_COMPAT_RESOURCE} (the default, native arm64 pixels) or
+ *       {@value #ARM64_COMPAT_X86_RESOURCE} (the x86-pixels build). With both on the classpath
+ *       the native one is used unless {@value #COMPAT_PIXELS_PROPERTY} is {@code x86}.
+ *   <li>Everywhere else it hands over to the stock loader unchanged.
  * </ul>
  *
  * <p>The setup steps (fonts, hyphenation data, ICU data, JNI registration properties, deferred
@@ -82,6 +86,23 @@ public class LinuxArm64NativeRuntimeLoader extends DefaultNativeRuntimeLoader {
 
   public static final String ARM64_RESOURCE = "native/linux/aarch64/libandroid_runtime.so";
 
+  /** The SDK <= 34 library (nativeruntime-dist-compat's layout), for SDK levels below 35. */
+  public static final String ARM64_COMPAT_RESOURCE =
+      "native/linux/aarch64/librobolectric-nativeruntime.so";
+
+  /**
+   * The same library built with x86 pixels (RA64_PIXELS=x86), from its own artifact. A separate
+   * path, so the two jars never shadow each other and the stock loader never picks it up.
+   */
+  public static final String ARM64_COMPAT_X86_RESOURCE =
+      "native/linux/aarch64/x86-pixels/librobolectric-nativeruntime.so";
+
+  /**
+   * Which compat build to load from the classpath: {@code native} or {@code x86}. Unset: the
+   * native one if present, otherwise the x86-pixels one.
+   */
+  public static final String COMPAT_PIXELS_PROPERTY = "robolectric.arm64.compatPixels";
+
   private static final int VANILLA_ICE_CREAM = 35;
 
   @Override
@@ -95,6 +116,18 @@ public class LinuxArm64NativeRuntimeLoader extends DefaultNativeRuntimeLoader {
     // library into another SDK's sandbox aborts the JVM in JNI_OnLoad (RegisterNatives fails
     // on changed signatures). Other SDKs go to the stock loader, which fails cleanly.
     int librarySdk = Integer.parseInt(System.getProperty(LIBRARY_SDK_PROPERTY, "36").trim());
+    // SDK <= 34 use one library for every SDK level (librobolectric-nativeruntime, from
+    // android12-hostruntime-dev): it registers its natives on Robolectric's own *Natives
+    // classes, so any SDK below 35 can load it. Used when the override names such a library
+    // (LIBRARY_SDK_PROPERTY below 35) or, on Linux arm64 with no override, from the classpath.
+    if (sdkInt() < VANILLA_ICE_CREAM
+        && ((!override.isEmpty() && librarySdk < VANILLA_ICE_CREAM)
+            || (override.isEmpty() && linuxArm64 && compatResource() != null))) {
+      loaded.set(true);
+      PerfStatsCollector.getInstance()
+          .measure("loadNativeRuntime", () -> loadCompat(override));
+      return;
+    }
     if (sdkInt() < VANILLA_ICE_CREAM
         || sdkInt() != librarySdk
         || (override.isEmpty() && !linuxArm64)) {
@@ -153,6 +186,100 @@ public class LinuxArm64NativeRuntimeLoader extends DefaultNativeRuntimeLoader {
     } catch (IOException e) {
       throw new AssertionError("Unable to load Robolectric native runtime library", e);
     }
+  }
+
+  /**
+   * The stock 4.17 loader's steps for SDK levels below 35, with our library: fonts and
+   * hyphenation data (SDK 26+), ICU data, extra resources, load, then hyphen.data.dir and
+   * Hyphenator.init() (SDK 28+). No JNI registration properties: this library binds its
+   * natives itself.
+   */
+  private void loadCompat(String override) {
+    try {
+      TempDirectory dir = new TempDirectory("nativeruntime");
+      setExtractDirectory(dir);
+      if (sdkInt() >= 26) {
+        callPrivate("maybeCopyFonts", dir);
+        callPrivate("maybeCopyHyphenData", dir);
+      }
+      callPrivate("maybeCopyIcuData", dir);
+      maybeCopyExtraResources(dir);
+      Path target = dir.getBasePath().resolve("librobolectric-nativeruntime.so");
+      if (!override.isEmpty()) {
+        Path path = Paths.get(override);
+        if (!Files.isRegularFile(path)) {
+          throw new AssertionError(LIBRARY_PROPERTY + " points at a missing file: " + path);
+        }
+        Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
+      } else {
+        try (InputStream in = compatResource().url.openStream()) {
+          Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+      }
+      System.load(target.toAbsolutePath().toString());
+      System.setProperty(
+          LOADED_FROM_PROPERTY,
+          (override.isEmpty() ? "classpath resource " + compatResource().name : override)
+              + " via " + target.toAbsolutePath());
+      System.setProperty(
+          "hyphen.data.dir",
+          dir.getBasePath().resolve("hyphen-data").toFile().getAbsolutePath());
+      if (sdkInt() >= 28) {
+        ReflectionHelpers.callStaticMethod(
+            Shadow.class.getClassLoader(), "android.text.Hyphenator", "init");
+      }
+    } catch (IOException e) {
+      throw new AssertionError("Unable to load Robolectric native runtime library", e);
+    }
+  }
+
+  /** A compat library found on the classpath. */
+  private static final class CompatResource {
+    final String name;
+    final URL url;
+
+    CompatResource(String name, URL url) {
+      this.name = name;
+      this.url = url;
+    }
+  }
+
+  /**
+   * The compat library on the classpath (not named *android_runtime*, so no sandbox rule), chosen
+   * by {@value #COMPAT_PIXELS_PROPERTY}; null if there is none. Naming a build that is not on
+   * the classpath is an error rather than a silent fallback.
+   */
+  private static CompatResource compatResource() {
+    String pixels = System.getProperty(COMPAT_PIXELS_PROPERTY, "").trim();
+    URL nativeUrl = resource(ARM64_COMPAT_RESOURCE);
+    URL x86Url = resource(ARM64_COMPAT_X86_RESOURCE);
+    switch (pixels) {
+      case "":
+        if (nativeUrl != null) {
+          return new CompatResource(ARM64_COMPAT_RESOURCE, nativeUrl);
+        }
+        return x86Url == null ? null : new CompatResource(ARM64_COMPAT_X86_RESOURCE, x86Url);
+      case "native":
+        if (nativeUrl == null) {
+          throw new AssertionError(COMPAT_PIXELS_PROPERTY + "=native, but "
+              + ARM64_COMPAT_RESOURCE + " is not on the test classpath");
+        }
+        return new CompatResource(ARM64_COMPAT_RESOURCE, nativeUrl);
+      case "x86":
+        if (x86Url == null) {
+          throw new AssertionError(COMPAT_PIXELS_PROPERTY + "=x86, but "
+              + ARM64_COMPAT_X86_RESOURCE + " is not on the test classpath");
+        }
+        return new CompatResource(ARM64_COMPAT_X86_RESOURCE, x86Url);
+      default:
+        throw new AssertionError(
+            COMPAT_PIXELS_PROPERTY + " must be native or x86, not \"" + pixels + "\"");
+    }
+  }
+
+  private static URL resource(String name) {
+    URL url = LinuxArm64NativeRuntimeLoader.class.getClassLoader().getResource(name);
+    return url != null ? url : ClassLoader.getSystemResource(name);
   }
 
   private static final String[] JNI_PROPERTIES = {

@@ -39,11 +39,20 @@ function(ra64_notices target)
   set(_dir "${CMAKE_BINARY_DIR}/notices/${_mod}")
   set(_gen "${_root}/tools/gen_notices.py")
 
+  # The target's config directory (config/ or config/compat/, CMakeLists.txt).
+  set(_cfg "${_ra64_config}")
   set(_args --src "${AOSP_SRC}" --closure "${AOSP_GEN_CMAKE}/closure.json" --module "${_mod}"
-      --extra "${_root}/config/notices-extra.toml" --policy "${_root}/config/notices-policy.toml")
+      --extra "${_cfg}/notices-extra.toml" --policy "${_cfg}/notices-policy.toml"
+      --var "src=${AOSP_SRC}")
   set(_deps "${_gen}" "${_root}/tools/blueprint.py" "${AOSP_GEN_CMAKE}/closure.json"
-      "${_root}/config/notices-extra.toml" "${_root}/config/notices-policy.toml"
-      "${_root}/config/sources.lock.json")
+      "${_cfg}/notices-extra.toml" "${_cfg}/notices-policy.toml"
+      "${_cfg}/sources.lock.json")
+  # A pixel mode (RA64_PIXELS) may add components of its own.
+  if(RA64_PIXELS AND NOT RA64_PIXELS STREQUAL "native"
+     AND EXISTS "${_cfg}/pixels/${RA64_PIXELS}-notices.toml")
+    list(APPEND _args --extra "${_cfg}/pixels/${RA64_PIXELS}-notices.toml")
+    list(APPEND _deps "${_cfg}/pixels/${RA64_PIXELS}-notices.toml")
+  endif()
   if(RA64_SYSROOT)
     list(APPEND _args --var "sysroot=${RA64_SYSROOT}")
   endif()

@@ -42,7 +42,7 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = SCREEN)
+@Config(sdk = [Config.ALL_SDKS], qualifiers = SCREEN)
 class CanvasScenesTest {
     private fun paint(color: Int, aa: Boolean = true, style: Paint.Style = Paint.Style.FILL) =
         Paint().apply {

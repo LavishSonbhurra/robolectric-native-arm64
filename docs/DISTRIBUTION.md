@@ -9,6 +9,7 @@ hosted and how versions are numbered.
 | Group | `io.github.lavishsonbhurra` |
 | Artifact | `robolectric-nativeruntime-linux-aarch64` |
 | First version | `4.17-16-robolectric-13921718-1` |
+| SDK 26 to 34 | `robolectric-nativeruntime-compat-linux-aarch64` and `-x86pixels`, from `1.0.19-1` (section 2a) |
 | Hosting | GitHub releases first, Maven Central after that |
 
 ## 1. Goal
@@ -34,6 +35,24 @@ only loads the library for the SDK it was built for, and the library only matche
 and a user would otherwise have to keep two versions in step. If the project later grows an x86_64 build or
 an SDK 35 build, the natives move to classifier artifacts or separate artifacts per SDK and the loader
 becomes its own artifact.
+
+### 2a. The SDK 26 to 34 artifacts
+
+SDK 34 and below load another library, `librobolectric-nativeruntime.so` from
+`org.robolectric:nativeruntime-dist-compat`, which follows its own versions. It is published as two
+code-free jars next to the loader ([COMPAT.md](COMPAT.md)):
+
+| Artifact | Resource | Notes |
+| --- | --- | --- |
+| `robolectric-nativeruntime-compat-linux-aarch64` | `native/linux/aarch64/librobolectric-nativeruntime.so` | Default: native arm64 (NEON) pixels; the path `nativeruntime-dist-compat` uses for x86_64 |
+| `robolectric-nativeruntime-compat-linux-aarch64-x86pixels` | `native/linux/aarch64/x86-pixels/librobolectric-nativeruntime.so` | Opt-in: Skia's x86 paths, pixels identical to the x86_64 library under qemu |
+
+Version: `<nativeruntime-dist-compat version>-<revision>`, so `1.0.19-1` first. The revision goes up for
+any rebuild of the same upstream version; a new upstream version starts again at `-1`. The loader from
+`4.17-16-robolectric-13921718-2` on loads them; older loaders ignore them. Separate artifacts rather than
+the loader jar, because users of SDK 36 only do not need the 15 MB, and rather than classifiers, because
+each build has its own POM, notices and checksums. Both are attached to the same GitHub release as the
+loader.
 
 Plus, as GitHub release assets for every tag: the bare `libandroid_runtime.so`, `THIRD_PARTY_NOTICES`,
 `notices.json`, `SHA256SUMS`, `build-info.txt` and the GitHub build-provenance attestation (`gh attestation
@@ -202,9 +221,7 @@ suites (5 to 10 minutes native on arm64, 9,086 tests at SDK 36). Both are in `bu
 
 ## 7. Out of scope for now
 
-SDK 34 and below use a different native library (`robolectric-nativeruntime`, from the Android 12 host
-runtime branch, distributed in `nativeruntime-dist-compat`) built by a different recipe from different
-sources (branch `android12-hostruntime-dev`). This project does not cover them. SDK 35 uses a
+SDK 26 to 34 are covered by the compat artifacts (section 2a). SDK 35 uses a
 `libandroid_runtime` like SDK 36 but built from Android 15; the same tooling may work with another pin and
 another closure, but nothing has been tried and no claim is made. Linux x86_64 is not needed (Robolectric
 ships it); the x86_64 build in this repository exists as a control for fidelity measurements and is not
@@ -212,9 +229,10 @@ distributed.
 
 ## 8. Release process
 
-1. A tag `v<version>` (for example `v4.17-16-robolectric-13921718-1`) runs `build.yml` with the rig, the
-   reproducibility job and the upstream suites.
-2. The `release` artifact of that run (jar, bare library, notices, checksums, build info, attestations)
-   becomes the GitHub release.
+1. A tag `v<version>` (for example `v4.17-16-robolectric-13921718-1`) runs `build.yml` and
+   `build-compat.yml` with the rig, the reproducibility job and the upstream suites.
+2. The `release` artifact of `build.yml` (jar, bare library, notices, checksums, build info,
+   attestations) and the `release-compat` artifact of `build-compat.yml` (both compat jars, both bare
+   libraries, the rest prefixed `compat-` or `compat-x86pixels-` so no name clashes with `build.yml`'s) become the GitHub release.
 3. Maven Central publishing follows once the namespace is verified, from a separate workflow or from a
    local machine with the signing key. It is not set up yet.

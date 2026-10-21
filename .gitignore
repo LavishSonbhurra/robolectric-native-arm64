@@ -1,8 +1,10 @@
 # Fetched sources, build output and downloaded toolchains (CMake build)
 /src/
+/src-compat/
 /build/
 /out/
 /dist/
+/dist-compat/
 /ref/
 /rust/toolchain/
 /toolchain/dl/
@@ -10,11 +12,12 @@
 /toolchain/build/
 __pycache__/
 
-# Gradle (root project, loader/, tests/rig/, tests/upstream/harness/)
+# Gradle (root project, loader/, compat/, tests/rig/, tests/upstream/harness/)
 .gradle/
 .kotlin/
 local.properties
 /loader/build/
+/compat/build/
 /tests/**/build/
 .work/
 
@@ -22,5 +25,7 @@ local.properties
 /tests/**/out/
 /tests/upstream/src/
 /tests/upstream/results/
+/tests/upstream/results-compat/
 /tests/upstream/lib/
+/tests/upstream/lib-compat/
 /tests/upstream/plugin/

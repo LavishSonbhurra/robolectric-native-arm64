@@ -24,8 +24,11 @@ Robolectric project. "Android" is a trademark of Google LLC.
   ([docs/rng-audit.md](docs/rng-audit.md)).
 * Platform: Linux arm64 with glibc 2.31 or newer (Debian 11, Ubuntu 20.04, RHEL 9, Amazon Linux 2023 and
   later). Java 21 is required by SDK 36.
-* Not covered: SDK 34 and below (a different native library built by a different recipe), SDK 37.
-  SDK 35 is untested.
+* SDK 26 to 34: the compat artifact `robolectric-nativeruntime-compat-linux-aarch64` holds the other
+  native library Robolectric uses below SDK 35 (`librobolectric-nativeruntime.so`, the one in
+  `nativeruntime-dist-compat` 1.0.19), built from source the same way. A second build of it,
+  `robolectric-nativeruntime-compat-linux-aarch64-x86pixels`, renders exactly like the x86_64 library
+  under qemu. See [docs/COMPAT.md](docs/COMPAT.md). Not covered: SDK 37. SDK 35 is untested.
 * Released on GitHub:
   [v4.17-16-robolectric-13921718-1](https://github.com/LavishSonbhurra/robolectric-native-arm64/releases/tag/v4.17-16-robolectric-13921718-1),
   built and attested by CI on GitHub's arm64 runners. Publishing to Maven Central comes later.
@@ -49,6 +52,9 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.17")
     // Inert on every platform except Linux aarch64.
     testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-linux-aarch64:4.17-16-robolectric-13921718-1")
+    // Only for tests at SDK 26 to 34 (needs loader 4.17-16-robolectric-13921718-2 or later). For
+    // x86-identical pixels use robolectric-nativeruntime-compat-linux-aarch64-x86pixels instead:
+    // testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-compat-linux-aarch64:1.0.19-1")
     // Before Maven Central: testRuntimeOnly(files("libs/robolectric-nativeruntime-linux-aarch64-4.17-16-robolectric-13921718-1.jar"))
 }
 

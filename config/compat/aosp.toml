@@ -1,0 +1,36 @@
+# Pin for the SDK <= 34 compat library, librobolectric-nativeruntime.so as
+# shipped in org.robolectric:nativeruntime-dist-compat:1.0.19 (RA64_TARGET=compat,
+# see tools/target.py).
+#
+# The source is AOSP's android12-hostruntime-dev branch: its manifest
+# overrides 14 projects with their android12-hostruntime-dev branch and takes
+# the rest from android12-dev. Branches move, so the pin is a commit of the
+# generated superproject (platform/superproject, branch
+# android12-hostruntime-dev), which records the exact commit of every
+# project. tools/fetch.py reads each project's commit from it.
+#
+# Why this commit: 1.0.19 was published for Robolectric commit 461231787
+# (2026-02-04, "Add support for native BitmapRegionDecoder from Android O
+# through U", bumps 1.0.18 -> 1.0.19); the native libraries in the jar are
+# dated 2026-02-04. frameworks/base reached its current head 034a7bb4
+# ("Bind BitmapRegionDecoder JNI") in superproject 9fcd9231 (2026-01-28).
+# 656d16be (2026-01-30) is the last superproject commit before the build;
+# the only project it changes against 9fcd9231 is external/icu (ICU data,
+# not compiled into the library; the jar's icudt68l.dat is an older copy
+# from 2021-11). The next commit, b106475e (2026-02-12), changes bionic and
+# frameworks/native.
+
+[aosp]
+gitiles = "https://android.googlesource.com"
+# platform/manifest commit (branch android12-hostruntime-dev, 2024-12-16):
+# project names and paths. Unchanged since before the superproject pin.
+manifest = "72b67c22773c160442d5a0576417bea51692e735"
+# platform/superproject commit (branch android12-hostruntime-dev).
+superproject = "656d16be911b9cd102f94bd5a5f0ae494d82e567"
+
+[variant]
+os = "linux_glibc"
+arch = "arm64"
+# Soong's global flags as of this tree's build/soong (tools/soong_flags.py).
+soong = "android12"
+# Android 12 has no build/release (no release configs or aconfig).

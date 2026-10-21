@@ -20,7 +20,7 @@ plugins {
 }
 
 group = "io.github.lavishsonbhurra"
-version = "4.17-16-robolectric-13921718-1"
+version = "4.17-16-robolectric-13921718-2"
 
 val artifactName = "robolectric-nativeruntime-linux-aarch64"
 // The loader reflects into this Robolectric release; see DefaultNativeRuntimeLoader.

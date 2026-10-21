@@ -1,0 +1,397 @@
+# Builds librobolectric-nativeruntime.so (the SDK <= 34 library from
+# AOSP android12-hostruntime-dev, the one in org.robolectric:nativeruntime-dist-compat) for
+# Linux arm64, checks it, runs the fidelity rig at SDK 30 and 34, packages it and attests the
+# result. Next to build.yml (SDK 36); same action pins. This workflow has not run on GitHub yet:
+# its commands are the ones used locally (docs/COMPAT.md), so expect fixes on the first run.
+#
+# Jobs
+#   build       container ubuntu:26.04; about 20 min of compile on a 2-core VM, so about
+#               10 to 15 min on the 4 vCPU runner, plus the sysroot and UBSan runtime
+#   rig         host runner, needs build; native arm64 JVM, SDK 30 and 34 (matrix)
+#   package     host runner, needs build and rig; both compat jars (library + notices, no code)
+#   reproduce   container, needs build; clean rebuild in another path, byte-for-byte compare,
+#               both pixel modes
+#   upstream    optional: Robolectric's own suites at SDK 26 to 34 on arm64, against the known
+#               failure list
+#   upstream-x86  optional, manual only: the same suites on an x86_64 runner with the official
+#               library and the stock loader, to refresh the known failure list. Under qemu on
+#               an arm64 VM this takes hours per SDK; on an x86_64 runner it is native speed.
+#
+# Pixel modes: every job that builds or tests the library runs for both. native (NEON) is the
+# default artifact, robolectric-nativeruntime-compat-linux-aarch64; x86 (RA64_PIXELS=x86, renders
+# like the x86_64 build under qemu) is the opt-in artifact with the -x86pixels suffix. Baselines:
+# tests/rig/baseline/arm64-compat-<pixels>-sdk<N>.json.
+name: build-compat
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      reproduce:
+        description: "Also run the reproducibility job"
+        type: boolean
+        default: false
+      upstream:
+        description: "Also run Robolectric's upstream suites (arm64, SDK 26 to 34)"
+        type: boolean
+        default: false
+      upstream_x86:
+        description: "Also run the upstream suites on x86_64 with the official library"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "41 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-compat-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # The official x86_64 library the JNI tables and exports are compared against. Robolectric
+  # downloads this jar itself when the rig runs.
+  DIST_COMPAT_VERSION: "1.0.19"
+  PACKAGES: >-
+    clang lld cmake ninja-build python3 patch flex bison
+    git curl xz-utils ca-certificates gnupg gpgv debian-archive-keyring unzip zstd pkg-config
+    llvm binutils
+
+jobs:
+  # ---------------------------------------------------------------------------------------------
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        pixels: [native, x86]
+    container:
+      image: ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944
+    steps:
+      - name: Install build packages
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends $PACKAGES
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # tools/fetch.py verifies every project (and the SIMDe tarball) against
+      # config/compat/sources.lock.json, so a stale cache is re-fetched, not trusted.
+      - name: Cache AOSP sources
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: src-compat
+          key: aosp-src-compat-${{ hashFiles('config/compat/sources.lock.json', 'config/compat/projects.toml') }}
+          restore-keys: aosp-src-compat-
+
+      - name: Cache toolchain downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: toolchain/dl
+          key: toolchain-dl-${{ hashFiles('toolchain/*.lock.json', 'toolchain/build-runtimes.sh') }}
+          restore-keys: toolchain-dl-
+
+      - name: Build
+        run: ci/build-compat.sh -j"$(nproc)" --out dist-compat --pixels ${{ matrix.pixels }}
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: arm64-compat-library-${{ matrix.pixels }}
+          path: dist-compat
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------------------------
+  rig:
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        pixels: [native, x86]
+        sdk: [30, 34]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arm64-compat-library-${{ matrix.pixels }}
+          path: dist-compat
+      - run: cd dist-compat && sha256sum --check --ignore-missing SHA256SUMS
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: "platforms;android-36 build-tools;35.0.0"
+          log-accepted-android-sdk-licenses: false
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: amd64
+      - name: Build the amd64 sysroot for aapt2
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends gpgv debian-archive-keyring
+          python3 -I toolchain/make-sysroot.py --arch amd64
+          echo "QEMU_LD_PREFIX=$PWD/toolchain/out/sysroot-bullseye-amd64" >> "$GITHUB_ENV"
+
+      # The rig picks the SDK level with -Prig.sdk; below 35 the loader treats
+      # -Prig.nativeLib as the SDK <= 34 library (-Prig.nativeLibSdk).
+      - name: Run the fidelity rig at SDK ${{ matrix.sdk }}
+        run: |
+          ./gradlew --no-daemon -p tests/rig :app:testDebugUnitTest \
+            -Prig.java="$JAVA_HOME/bin/java" -Prig.sdk=${{ matrix.sdk }} -Prig.nativeLibSdk=34 \
+            -Prig.out="$PWD/out/arm64-${{ matrix.pixels }}-sdk${{ matrix.sdk }}" \
+            -Prig.nativeLib="$PWD/dist-compat/librobolectric-nativeruntime.so"
+
+      # Goldens: the official x86_64 library under the stock loader. For x86 pixels the
+      # baseline is "identical"; for native it allows the recorded NEON differences.
+      - name: Compare against the x86_64 goldens
+        run: |
+          sudo apt-get install -y --no-install-recommends python3-pil
+          out=out/arm64-${{ matrix.pixels }}-sdk${{ matrix.sdk }}
+          python3 tests/rig/scripts/compare.py tests/rig/goldens/x86_64-sdk${{ matrix.sdk }} $out \
+            --diff-dir $out/_diff --json $out/_report.json || true
+          python3 -I ci/check-baseline.py $out/_report.json \
+            --baseline tests/rig/baseline/arm64-compat-${{ matrix.pixels }}-sdk${{ matrix.sdk }}.json
+
+      - name: Check which library was loaded
+        run: |
+          out=out/arm64-${{ matrix.pixels }}-sdk${{ matrix.sdk }}
+          grep -q 'loader=robolectricarm64.LinuxArm64NativeRuntimeLoader' $out/_loader.txt
+          grep -q "loadedFrom=$PWD/dist-compat/librobolectric-nativeruntime.so" $out/_loader.txt
+
+      # JNI tables (76 tables, 906 methods) and exports against the official library, taken
+      # from the nativeruntime-dist-compat jar Robolectric downloaded. Used here only.
+      - name: JNI tables and exports against the official library
+        if: matrix.sdk == 30
+        run: |
+          jar=$(ls ~/.m2/repository/org/robolectric/nativeruntime-dist-compat/${DIST_COMPAT_VERSION}/*.jar | head -1)
+          mkdir -p ref && unzip -qo -j "$jar" native/linux/x86_64/librobolectric-nativeruntime.so -d ref
+          python3 -I tools/jni_tables.py compare ref/librobolectric-nativeruntime.so \
+            dist-compat/librobolectric-nativeruntime.so > jni-compare.txt || true
+          cat jni-compare.txt
+          diff -u ci/expected-jni-compare-compat.txt jni-compare.txt
+          rm -rf ref
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: rig-output-${{ matrix.pixels }}-sdk${{ matrix.sdk }}
+          path: out
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------------------------
+  package:
+    needs: [build, rig]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arm64-compat-library-native
+          path: dist-compat
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arm64-compat-library-x86
+          path: dist-compat-x86
+      - run: |
+          (cd dist-compat && sha256sum --check --ignore-missing SHA256SUMS)
+          (cd dist-compat-x86 && sha256sum --check --ignore-missing SHA256SUMS)
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      # The native build goes in as native/linux/aarch64/librobolectric-nativeruntime.so, the
+      # path nativeruntime-dist-compat uses for x86_64; the x86-pixels build as
+      # native/linux/aarch64/x86-pixels/librobolectric-nativeruntime.so in its own artifact.
+      # Fonts, ICU data and hyphenation data come from the official jar, which Robolectric
+      # already depends on. The jars hold no code; the loader plugin from the SDK 36 artifact
+      # (robolectric-nativeruntime-linux-aarch64) loads them.
+      - name: Build the compat jars with the libraries inside
+        run: |
+          ./gradlew --no-daemon :compat:jar :compat-x86pixels:jar \
+            -Pra64.compatLib="$PWD/dist-compat/librobolectric-nativeruntime.so" \
+            -Pra64.compatNotice="$PWD/dist-compat/THIRD_PARTY_NOTICES" \
+            -Pra64.compatX86Lib="$PWD/dist-compat-x86/librobolectric-nativeruntime.so" \
+            -Pra64.compatX86Notice="$PWD/dist-compat-x86/THIRD_PARTY_NOTICES"
+          unzip -l compat/build/libs/robolectric-nativeruntime-compat-linux-aarch64-*[0-9].jar \
+            | grep -q ' native/linux/aarch64/librobolectric-nativeruntime.so$'
+          unzip -l compat/x86pixels/build/libs/*-x86pixels-*[0-9].jar \
+            | grep -q ' native/linux/aarch64/x86-pixels/librobolectric-nativeruntime.so$'
+          # Same GitHub release as build.yml's assets, so every name differs from those: the
+          # libraries have their own names, the rest is prefixed compat- / compat-x86pixels-.
+          mkdir -p release-compat
+          cp compat/build/libs/*.jar compat/x86pixels/build/libs/*.jar release-compat/
+          cp dist-compat/librobolectric-nativeruntime.so release-compat/
+          cp dist-compat-x86/librobolectric-nativeruntime.so release-compat/librobolectric-nativeruntime-x86pixels.so
+          for f in THIRD_PARTY_NOTICES notices.json build-info.txt; do
+            cp "dist-compat/$f" "release-compat/compat-$f"
+            cp "dist-compat-x86/$f" "release-compat/compat-x86pixels-$f"
+          done
+          cd release-compat && sha256sum * > compat-SHA256SUMS && cat compat-SHA256SUMS
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            release-compat/librobolectric-nativeruntime.so
+            release-compat/librobolectric-nativeruntime-x86pixels.so
+            release-compat/*.jar
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-compat
+          path: release-compat
+          retention-days: 90
+
+  # ---------------------------------------------------------------------------------------------
+  reproduce:
+    needs: build
+    if: github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v') || inputs.reproduce
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        pixels: [native, x86]
+    container:
+      image: ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944
+    steps:
+      - run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends $PACKAGES diffoscope-minimal
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arm64-compat-library-${{ matrix.pixels }}
+          path: first
+      - name: Rebuild in another directory
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          mkdir -p /opt/ra64-second
+          git archive HEAD | tar -x -C /opt/ra64-second
+          cd /opt/ra64-second
+          ci/build-compat.sh -j3 --out "$GITHUB_WORKSPACE/second" --pixels ${{ matrix.pixels }}
+      - name: Compare
+        id: cmp
+        run: |
+          set -e
+          sha256sum first/librobolectric-nativeruntime.so second/librobolectric-nativeruntime.so
+          cmp first/THIRD_PARTY_NOTICES second/THIRD_PARTY_NOTICES
+          python3 -I ci/compare-libs.py first/librobolectric-nativeruntime.so second/librobolectric-nativeruntime.so
+      - name: Explain the difference
+        if: failure() && steps.cmp.outcome == 'failure'
+        run: diffoscope --text diffoscope.txt first/librobolectric-nativeruntime.so second/librobolectric-nativeruntime.so || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: reproducibility-report-compat-${{ matrix.pixels }}
+          path: |
+            diffoscope.txt
+            second/SHA256SUMS
+            second/build-info.txt
+
+  # ---------------------------------------------------------------------------------------------
+  upstream:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.upstream
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arm64-compat-library-native
+          path: dist-compat
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: "platforms;android-36 build-tools;35.0.0"
+          log-accepted-android-sdk-licenses: false
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: amd64
+      - run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends gpgv debian-archive-keyring
+          python3 -I toolchain/make-sysroot.py --arch amd64
+          echo "QEMU_LD_PREFIX=$PWD/toolchain/out/sysroot-bullseye-amd64" >> "$GITHUB_ENV"
+      # robotests, nativegraphics and ctesque at every SDK level from 26 to 34 in one run
+      # (-Psuite.sdks); the init script passes the library and nativeLibrarySdk=34.
+      - name: Run the upstream suites
+        run: |
+          SDKS=26,27,28,29,30,31,32,33,34 ARM64_LIB="$PWD/dist-compat/librobolectric-nativeruntime.so" \
+            tests/upstream/scripts/run.sh arm64 ci-compat \
+            -Psuite.heap=3g :robotests:test :nativegraphics:testDebugUnitTest :ctesque:testDebugUnitTest || true
+      - name: Compare failures with the known list
+        run: |
+          python3 -I ci/check-upstream-failures.py tests/upstream/results/ci-compat/junit \
+            --expected ci/upstream-expected-failures-compat.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: upstream-junit-compat
+          path: tests/upstream/results/ci-compat
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------------------------
+  # Reference run on x86_64: official library, stock loader, same suites and SDK levels. Its
+  # failures are the ones that are not about arm64; ci/upstream-expected-failures-compat.txt is
+  # refreshed from them. Manual only.
+  upstream-x86:
+    if: inputs.upstream_x86
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: "platforms;android-36 build-tools;35.0.0"
+          log-accepted-android-sdk-licenses: false
+      - name: Run the upstream suites (x86_64, official library)
+        run: |
+          SDKS=26,27,28,29,30,31,32,33,34 SUITE_JAVA="$JAVA_HOME/bin/java" \
+            tests/upstream/scripts/run.sh none x86-compat \
+            -Psuite.heap=3g :robotests:test :nativegraphics:testDebugUnitTest :ctesque:testDebugUnitTest || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: upstream-junit-x86-compat
+          path: tests/upstream/results/x86-compat
+          retention-days: 30

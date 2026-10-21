@@ -1,0 +1,80 @@
+Skia: arm64 SIMD shortcuts also require NEON
+
+A few arm64 shortcuts in Skia and skcms test only for the architecture
+(__aarch64__ / SK_CPU_ARM64) and then use NEON types and instructions. With
+NEON on, which every normal arm64 build has, the extra condition is always
+true and the code is unchanged. It lets the experimental RA64_PIXELS modes
+build Skia with NEON off, where these places fall through to the same
+portable or SSE code that x86_64 runs.
+
+--- a/include/private/SkHalf.h	2026-10-21 10:46:03.757073491 +0000
++++ b/include/private/SkHalf.h	2026-10-21 10:46:03.874775607 +0000
+@@ -40,7 +40,7 @@
+ 
+ static inline Sk4f SkHalfToFloat_finite_ftz(uint64_t rgba) {
+     Sk4h hs = Sk4h::Load(&rgba);
+-#if !defined(SKNX_NO_SIMD) && defined(SK_CPU_ARM64)
++#if !defined(SKNX_NO_SIMD) && defined(SK_CPU_ARM64) && defined(SK_ARM_HAS_NEON)
+     float32x4_t fs;
+     asm ("fcvtl %[fs].4s, %[hs].4h   \n"   // vcvt_f32_f16(...)
+         : [fs] "=w" (fs)                   // =w: write-only NEON register
+@@ -62,7 +62,7 @@
+ }
+ 
+ static inline Sk4h SkFloatToHalf_finite_ftz(const Sk4f& fs) {
+-#if !defined(SKNX_NO_SIMD) && defined(SK_CPU_ARM64)
++#if !defined(SKNX_NO_SIMD) && defined(SK_CPU_ARM64) && defined(SK_ARM_HAS_NEON)
+     float32x4_t vec = fs.fVec;
+     asm ("fcvtn %[vec].4h, %[vec].4s  \n"   // vcvt_f16_f32(vec)
+         : [vec] "+w" (vec));                // +w: read-write NEON register
+--- a/include/private/SkVx.h	2026-10-21 10:46:03.776809831 +0000
++++ b/include/private/SkVx.h	2026-10-21 10:46:03.895599915 +0000
+@@ -592,7 +592,7 @@
+                                                                   _MM_FROUND_CUR_DIRECTION));
+     }
+ #endif
+-#if defined(__aarch64__)
++#if defined(__aarch64__) && defined(__ARM_NEON)
+     if /*constexpr*/ (N == 4) {
+         return unchecked_bit_pun<Vec<N,uint16_t>>(vcvt_f16_f32(unchecked_bit_pun<float32x4_t>(x)));
+ 
+@@ -611,7 +611,7 @@
+         return unchecked_bit_pun<Vec<N,float>>(_mm256_cvtph_ps(unchecked_bit_pun<__m128i>(x)));
+     }
+ #endif
+-#if defined(__aarch64__)
++#if defined(__aarch64__) && defined(__ARM_NEON)
+     if /*constexpr*/ (N == 4) {
+         return unchecked_bit_pun<Vec<N,float>>(vcvt_f32_f16(unchecked_bit_pun<float16x4_t>(x)));
+     }
+--- a/src/opts/SkRasterPipeline_opts.h	2026-10-21 10:46:03.799238951 +0000
++++ b/src/opts/SkRasterPipeline_opts.h	2026-10-21 10:46:03.914855012 +0000
+@@ -3137,7 +3137,7 @@
+     __m128 lo,hi;
+     split(x, &lo,&hi);
+     return join<F>(_mm_sqrt_ps(lo), _mm_sqrt_ps(hi));
+-#elif defined(SK_CPU_ARM64)
++#elif defined(SK_CPU_ARM64) && defined(JUMPER_IS_NEON)
+     float32x4_t lo,hi;
+     split(x, &lo,&hi);
+     return join<F>(vsqrtq_f32(lo), vsqrtq_f32(hi));
+@@ -3160,7 +3160,7 @@
+ }
+ 
+ SI F floor_(F x) {
+-#if defined(SK_CPU_ARM64)
++#if defined(SK_CPU_ARM64) && defined(JUMPER_IS_NEON)
+     float32x4_t lo,hi;
+     split(x, &lo,&hi);
+     return join<F>(vrndmq_f32(lo), vrndmq_f32(hi));
+--- a/third_party/skcms/src/Transform_inl.h	2026-10-21 10:46:03.823694485 +0000
++++ b/third_party/skcms/src/Transform_inl.h	2026-10-21 10:46:03.935815881 +0000
+@@ -233,7 +233,7 @@
+     return floorf_(x);
+ #elif defined(USING_NEON_FP16)
+     return vrndmq_f16(x);
+-#elif defined(__aarch64__)
++#elif defined(__aarch64__) && defined(__ARM_NEON)
+     return vrndmq_f32(x);
+ #elif defined(USING_AVX512F)
+     // Clang's _mm512_floor_ps() passes its mask as -1, not (__mmask16)-1,

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs Robolectric 4.17's own test suites (harness/) at SDK 36 in one mode.
+# Runs Robolectric 4.17's own test suites (harness/) in one mode, at SDK 36 or (SDKS) at SDK 26 to 34.
 #   arm64  aarch64 JDK 21, the loader plugin (injected by an init script) and the arm64 library
 #   x86    x86_64 JDK 21 (under qemu-user on an arm64 host), the stock loader and the official
 #          library from android-all, as the reference
@@ -9,7 +9,10 @@
 # Results go to results/<name>/: gradle.log, _run.txt and junit/<module>/*.xml.
 #
 # Environment (all optional unless noted):
-#   ARM64_LIB        library under test (default <repo>/build/out/lib/libandroid_runtime.so)
+#   ARM64_LIB        library under test (default <repo>/build/out/lib/libandroid_runtime.so, or
+#                    <repo>/build/compat/lib/librobolectric-nativeruntime.so when SDKS are all < 35)
+#   SDKS             SDK levels to run, comma separated (default 36). Levels 26 to 34 use the
+#                    SDK <= 34 library; do not mix them with 35+ in one run
 #   LOADER_JAR       loader plugin jar (default: built with ./gradlew :loader:jar at the repo root)
 #   JAVA_HOME        JDK 21 that runs Gradle; also the test JVM in arm64 mode unless SUITE_JAVA is set
 #   SUITE_JAVA       java executable for the test JVM
@@ -46,10 +49,17 @@ elif [ "$(git -C "$W/src" rev-parse HEAD)" != "$(git -C "$W/src" rev-parse -q --
   echo ">> warning: src/ is not at tag $REF" >&2
 fi
 
-args=(--no-daemon -p "$W/harness" --max-workers=1 --continue)
+args=(--no-daemon -p "$W/harness" --max-workers=1 --continue "-Psuite.sdks=${SDKS:-36}")
+# SDK levels below 35 use the SDK <= 34 library (librobolectric-nativeruntime.so): ARM64_LIB
+# names that file and the loader is told so (robolectric.arm64.nativeLibrarySdk).
+compat=1
+for s in ${SDKS//,/ }; do [ "$s" -ge 35 ] && compat=0; done
+[ -z "${SDKS:-}" ] && compat=0
 case "$MODE" in
   arm64)
-    lib="${ARM64_LIB:-$REPO/build/out/lib/libandroid_runtime.so}"
+    if [ "$compat" = 1 ]; then deflib="$REPO/build/compat/lib/librobolectric-nativeruntime.so"
+    else deflib="$REPO/build/out/lib/libandroid_runtime.so"; fi
+    lib="${ARM64_LIB:-$deflib}"
     [ -f "$lib" ] || { echo "no library at $lib (set ARM64_LIB)" >&2; exit 1; }
     jar="${LOADER_JAR:-}"
     if [ -z "$jar" ]; then
@@ -60,6 +70,7 @@ case "$MODE" in
     args+=(-I "$W/scripts/arm64.init.gradle.kts"
            "-Parm64.loaderJar=$(cd "$(dirname "$jar")" && pwd)/$(basename "$jar")"
            "-Parm64.nativeLibrary=$(cd "$(dirname "$lib")" && pwd)/$(basename "$lib")")
+    [ "$compat" = 1 ] && args+=("-Parm64.nativeLibrarySdk=34")
     [ -n "${SUITE_JAVA:-}" ] && args+=("-Psuite.java=$SUITE_JAVA") ;;
   x86)
     [ -n "${X86_JAVA:-}" ] || { echo "mode x86 needs X86_JAVA (an x86_64 JDK 21 java)" >&2; exit 2; }

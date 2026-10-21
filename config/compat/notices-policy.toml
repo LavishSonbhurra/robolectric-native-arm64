@@ -1,0 +1,78 @@
+# Policy for tools/gen_notices.py --check, compat target (same format as
+# config/notices-policy.toml).
+#
+# allowed_kinds: licence kinds (Soong license_kinds names) that may appear in a
+# component whose code is linked into the library. AOSP attaches one licence
+# module to a whole project or directory, so a component lists the kinds of
+# files that are not compiled as well; those are marked below. Anything else
+# fails the build until someone reads it and either adds it here or removes
+# the component.
+allowed_kinds = [
+  "SPDX-license-identifier-Apache-2.0",
+  "SPDX-license-identifier-BSD",
+  "SPDX-license-identifier-BSD-3-Clause",
+  "SPDX-license-identifier-MIT",
+  "SPDX-license-identifier-ISC",
+  "SPDX-license-identifier-Zlib",
+  "SPDX-license-identifier-ICU",
+  "SPDX-license-identifier-Unicode-3.0",
+  "SPDX-license-identifier-Unicode-DFS",
+  "SPDX-license-identifier-FTL",
+  "SPDX-license-identifier-CC0-1.0",
+  "SPDX-license-identifier-W3C",
+  "SPDX-license-identifier-NCSA",      # hardware/interfaces project licence module
+  "legacy_permissive",                 # sqlite (public domain)
+  "legacy_notice",
+  "legacy_unencumbered",
+  "SPDX-license-identifier-FSFAP",     # autoconf macro files, not compiled
+  "SPDX-license-identifier-OFL",       # harfbuzz test fonts, not compiled
+  "SPDX-license-identifier-CC-BY",     # frameworks/base docs, not compiled
+  "SPDX-license-identifier-EPL",       # ICU test data, not compiled
+  "SPDX-license-identifier-GFDL",      # expat docs, not compiled
+  "SPDX-license-identifier-PSF-2.0",   # fmtlib Python scripts, not compiled
+  "SPDX-license-identifier-Beerware",  # libjpeg-turbo test helper, not compiled
+]
+
+# Components whose licence is a special agreement or "by exception only" in
+# AOSP. Each needs a human decision, recorded here with the reason. The reason
+# is printed in the NOTICE file.
+[[acknowledged]]
+id = "external_dng_sdk_license"
+reason = """Adobe DNG SDK License Agreement plus a patent grant. Permissive, with an
+indemnification clause for commercial distributors (section 5) and a mandatory
+notice."""
+
+[[acknowledged]]
+id = "external_freetype_license"
+reason = """FreeType is dual licensed (FTL or GPLv2+). This library uses it under
+the FTL. The LGPL kind in the AOSP licence module comes from a bulk licence
+import: no compiled or included file under src/ or include/ carries an LGPL or
+GPL header."""
+
+[[acknowledged]]
+id = "external_skia_license"
+reason = """Skia is BSD-3-Clause. The MPL kind comes from the GIF decoder
+(third_party/libgifcodec/SkGifImageReader.cpp, compiled), which is triple
+licensed MPL 1.1 / GPL 2.0 / LGPL 2.1 and is used here under the MPL 1.1, as in
+Google's own build of this library. The MPL covers those files only; their
+source is the pinned Skia tree, and the licence block is in this NOTICE."""
+
+[[acknowledged]]
+id = "external_harfbuzz_ng_license"
+reason = """HarfBuzz is MIT (Old MIT). The WTFPL kind in the AOSP licence module
+comes from mingw-ldd.py, a build helper script that is not compiled."""
+
+[[acknowledged]]
+id = "frameworks_base_license"
+reason = """frameworks/base is Apache-2.0. Its project-wide licence module also lists
+CPL-1.0, GPL and GPL-2.0 for files elsewhere in the project; no file in the
+directories this build uses (core/jni, libs/hwui, libs/androidfw,
+libs/hostgraphics, media/jni) carries those licences."""
+
+[[acknowledged]]
+id = "system_incremental_delivery_incfs_license"
+reason = """libincfs-utils is Apache-2.0. The GPL-2.0 kind comes from the Linux
+userspace API header kernel-headers/linux/incrementalfs.h
+(GPL-2.0 WITH Linux-syscall-note), which map_ptr.cpp includes through
+incfs_ndk.h. The syscall note exempts programs that use the kernel interface
+through such headers."""

@@ -1,0 +1,145 @@
+# module<TAB>class<TAB>test. Known failures of the SDK <= 34 arm64 library on the upstream
+# suites, one run with SDKS=26,27,28,29,30,31,32,33,34 (Robolectric adds "[NN]" to test names
+# for every level but the highest). Source: tests/upstream run of 2026-10-21 on Ubuntu 26.04
+# (glibc 2.43): robotests, nativegraphics and ctesque, 15 distinct tests.
+# Causes:
+#  * ShadowSQLiteConnectionTest (12) and SQLiteLibraryLoaderTest force LEGACY sqlite4java, which
+#    has no linux-aarch64 native. Not this library.
+#  * ShadowViewThreadTest.testNewestSdk runs at SDK 37, which has no arm64 library.
+#  * ShadowNativeTableMaskFilterTest fails the same way with the official library on x86_64.
+#  * ShadowNativeVectorDrawableTest.testBasicVectorDrawables (SDK 26 to 34): its golden was made
+#    with a glibc older than 2.41. Skia's SVG arcTo calls atan2f and tanf; glibc 2.41 and later
+#    return the correctly rounded value, older releases an approximation, so the arc geometry
+#    moves and 87 pixels exceed the test's tolerance (it allows 20). Google's official x86_64
+#    library fails it identically on x86_64 with glibc 2.41 or later, and our build passes it
+#    with glibc 2.40 or older on x86_64. See docs/COMPAT.md. Expected on any host with glibc
+#    2.41 or later, either architecture.
+# A test failing that is not listed here fails the CI job; a listed test passing is reported only.
+nativegraphics	org.robolectric.shadows.ShadowNativeTableMaskFilterTest	initializationError
+nativegraphics	org.robolectric.shadows.ShadowNativeVectorDrawableTest	testBasicVectorDrawables
+nativegraphics	org.robolectric.shadows.ShadowNativeVectorDrawableTest	testBasicVectorDrawables[26]
+nativegraphics	org.robolectric.shadows.ShadowNativeVectorDrawableTest	testBasicVectorDrawables[27]
+nativegraphics	org.robolectric.shadows.ShadowNativeVectorDrawableTest	testBasicVectorDrawables[28]
+nativegraphics	org.robolectric.shadows.ShadowNativeVectorDrawableTest	testBasicVectorDrawables[29]
+nativegraphics	org.robolectric.shadows.ShadowNativeVectorDrawableTest	testBasicVectorDrawables[30]
+nativegraphics	org.robolectric.shadows.ShadowNativeVectorDrawableTest	testBasicVectorDrawables[31]
+nativegraphics	org.robolectric.shadows.ShadowNativeVectorDrawableTest	testBasicVectorDrawables[32]
+nativegraphics	org.robolectric.shadows.ShadowNativeVectorDrawableTest	testBasicVectorDrawables[33]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	cancel_shouldCancelAllStatements
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	cancel_shouldCancelAllStatements[26]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	cancel_shouldCancelAllStatements[27]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	cancel_shouldCancelAllStatements[28]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	cancel_shouldCancelAllStatements[29]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	cancel_shouldCancelAllStatements[30]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	cancel_shouldCancelAllStatements[31]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	cancel_shouldCancelAllStatements[32]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	cancel_shouldCancelAllStatements[33]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	error_resultsInSpecificExceptionWithCause
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	error_resultsInSpecificExceptionWithCause[26]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	error_resultsInSpecificExceptionWithCause[27]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	error_resultsInSpecificExceptionWithCause[28]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	error_resultsInSpecificExceptionWithCause[29]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	error_resultsInSpecificExceptionWithCause[30]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	error_resultsInSpecificExceptionWithCause[31]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	error_resultsInSpecificExceptionWithCause[32]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	error_resultsInSpecificExceptionWithCause[33]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	interruption_doesNotConcurrentlyModifyDatabase
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	interruption_doesNotConcurrentlyModifyDatabase[26]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	interruption_doesNotConcurrentlyModifyDatabase[27]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	interruption_doesNotConcurrentlyModifyDatabase[28]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	interruption_doesNotConcurrentlyModifyDatabase[29]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	interruption_doesNotConcurrentlyModifyDatabase[30]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	interruption_doesNotConcurrentlyModifyDatabase[31]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	interruption_doesNotConcurrentlyModifyDatabase[32]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	interruption_doesNotConcurrentlyModifyDatabase[33]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeClose_closesConnection
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeClose_closesConnection[26]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeClose_closesConnection[27]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeClose_closesConnection[28]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeClose_closesConnection[29]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeClose_closesConnection[30]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeClose_closesConnection[31]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeClose_closesConnection[32]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeClose_closesConnection[33]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeOpen_addsConnectionToPool
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeOpen_addsConnectionToPool[26]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeOpen_addsConnectionToPool[27]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeOpen_addsConnectionToPool[28]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeOpen_addsConnectionToPool[29]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeOpen_addsConnectionToPool[30]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeOpen_addsConnectionToPool[31]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeOpen_addsConnectionToPool[32]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeOpen_addsConnectionToPool[33]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsConnectionCache
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsConnectionCache[26]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsConnectionCache[27]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsConnectionCache[28]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsConnectionCache[29]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsConnectionCache[30]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsConnectionCache[31]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsConnectionCache[32]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsConnectionCache[33]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsStatementCache
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsStatementCache[26]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsStatementCache[27]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsStatementCache[28]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsStatementCache[29]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsStatementCache[30]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsStatementCache[31]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsStatementCache[32]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsStatementCache[33]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_closesConnection
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_closesConnection[26]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_closesConnection[27]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_closesConnection[28]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_closesConnection[29]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_closesConnection[30]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_closesConnection[31]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_closesConnection[32]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_closesConnection[33]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSQLWithLocalizedOrUnicodeCollatorShouldBeSortedAsNoCase
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSQLWithLocalizedOrUnicodeCollatorShouldBeSortedAsNoCase[26]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSQLWithLocalizedOrUnicodeCollatorShouldBeSortedAsNoCase[27]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSQLWithLocalizedOrUnicodeCollatorShouldBeSortedAsNoCase[28]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSQLWithLocalizedOrUnicodeCollatorShouldBeSortedAsNoCase[29]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSQLWithLocalizedOrUnicodeCollatorShouldBeSortedAsNoCase[30]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSQLWithLocalizedOrUnicodeCollatorShouldBeSortedAsNoCase[31]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSQLWithLocalizedOrUnicodeCollatorShouldBeSortedAsNoCase[32]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSQLWithLocalizedOrUnicodeCollatorShouldBeSortedAsNoCase[33]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSqlConversion
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSqlConversion[26]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSqlConversion[27]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSqlConversion[28]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSqlConversion[29]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSqlConversion[30]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSqlConversion[31]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSqlConversion[32]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSqlConversion[33]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	test_setUseInMemoryDatabase
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	test_setUseInMemoryDatabase[26]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	test_setUseInMemoryDatabase[27]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	test_setUseInMemoryDatabase[28]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	test_setUseInMemoryDatabase[29]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	test_setUseInMemoryDatabase[30]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	test_setUseInMemoryDatabase[31]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	test_setUseInMemoryDatabase[32]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	test_setUseInMemoryDatabase[33]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	uniqueConstraintViolation_errorMessage
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	uniqueConstraintViolation_errorMessage[26]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	uniqueConstraintViolation_errorMessage[27]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	uniqueConstraintViolation_errorMessage[28]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	uniqueConstraintViolation_errorMessage[29]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	uniqueConstraintViolation_errorMessage[30]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	uniqueConstraintViolation_errorMessage[31]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	uniqueConstraintViolation_errorMessage[32]
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	uniqueConstraintViolation_errorMessage[33]
+robotests	org.robolectric.shadows.ShadowViewThreadTest	testNewestSdk
+robotests	org.robolectric.util.SQLiteLibraryLoaderTest	shouldExtractNativeLibrary
+robotests	org.robolectric.util.SQLiteLibraryLoaderTest	shouldExtractNativeLibrary[26]
+robotests	org.robolectric.util.SQLiteLibraryLoaderTest	shouldExtractNativeLibrary[27]
+robotests	org.robolectric.util.SQLiteLibraryLoaderTest	shouldExtractNativeLibrary[28]
+robotests	org.robolectric.util.SQLiteLibraryLoaderTest	shouldExtractNativeLibrary[29]
+robotests	org.robolectric.util.SQLiteLibraryLoaderTest	shouldExtractNativeLibrary[30]
+robotests	org.robolectric.util.SQLiteLibraryLoaderTest	shouldExtractNativeLibrary[31]
+robotests	org.robolectric.util.SQLiteLibraryLoaderTest	shouldExtractNativeLibrary[32]
+robotests	org.robolectric.util.SQLiteLibraryLoaderTest	shouldExtractNativeLibrary[33]
