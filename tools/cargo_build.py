@@ -78,6 +78,8 @@ def main():
     for rel in args.link:
         dst = os.path.join(args.stage, rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if os.path.islink(dst) and os.readlink(dst) != os.path.join(SRC, rel):
+            os.unlink(dst)
         if not os.path.islink(dst):
             os.symlink(os.path.join(SRC, rel), dst)
     ws = os.path.join(args.stage, args.workspace)

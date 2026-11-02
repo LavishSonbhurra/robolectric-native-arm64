@@ -6,6 +6,10 @@ set(AOSP_RUST_STAGE "${CMAKE_BINARY_DIR}/rust/tree")
 set(AOSP_RUST_TARGET "${CMAKE_BINARY_DIR}/rust/target")
 set(_cargo_build ${Python3_EXECUTABLE} -I "${CMAKE_SOURCE_DIR}/tools/cargo_build.py"
     --stage "${AOSP_RUST_STAGE}" --target-dir "${AOSP_RUST_TARGET}")
+# The script finds the source tree through RA64_TARGET.
+if(NOT RA64_TARGET STREQUAL "sdk36")
+  list(PREPEND _cargo_build "${CMAKE_COMMAND}" -E env "RA64_TARGET=${RA64_TARGET}")
+endif()
 # Workspace manifest and lock files: the target's own when it has them.
 set(_cargo_dir "${CMAKE_SOURCE_DIR}/tools/cargo")
 if(EXISTS "${_ra64_config}/cargo")

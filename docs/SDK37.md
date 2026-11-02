@@ -9,7 +9,8 @@ Inputs live in `config/sdk37/` (`aosp.toml`, `projects.toml`, `sources.lock.json
 `overrides.toml`, `rustlibs.toml`, `cargo/`, `notices-*.toml`, `patches/`, `reference/`), sources in
 `src-sdk37/`. `RA64_TARGET=sdk37` (CMake cache variable and environment for the tools) switches
 every path. `sdk36` and `compat` are unchanged: from main and from this branch they generate the
-same 251 and 128 files under `cmake-gen` and the same 4 Rust build files, byte for byte.
+same 251 and 128 files under `cmake-gen` and the same 4 Rust build files, byte for byte, and the same
+`build.ninja` apart from hashes of the checkout path and the list of tool files CMake watches.
 
 ## Building
 
@@ -20,7 +21,11 @@ cmake -S . -B build/sdk37 -G Ninja -DRA64_TARGET=sdk37 -DRA64_USE_SYSROOT=ON
 ninja -C build/sdk37
 ```
 
-@BUILD_TIME@
+A clean build without ccache took 8,604 s of ninja time (2 h 23 min), `-j2` on the 2 vCPU, 11 GB VM,
+with memhold stopped. That includes cargo builds of aconfig, cxxbridge and bindgen. It ran in three
+slices under the shared build lock, because two steps failed on the way and were fixed; nothing was
+recompiled between slices. The result is byte-identical to the incremental ccache build that the
+tests below ran on (SHA-256 `b406e55ddea0c95e...`, unstripped; stripped 23,999,864 bytes).
 
 The closure has 289 modules, 168 of them compiled, 3,559 C and C++ sources and 6 host tools (SDK
 36: 115, 81, 2,350 and 4). The Rust part is 44 crates, 31 of them in `librustlibs.a`.
@@ -227,7 +232,7 @@ is 24.0 MB, against 15.2 MB for SDK 36.
 ## Notices
 
 `gen_notices.py --check` reports 0 problems with 79 components linked.
-`tools/check_notice_holders.py` reports 0 holders missing over @NOTICE_SOURCES@ linked sources.
+`tools/check_notice_holders.py` reports 0 holders missing over 1,615 linked sources.
 New entries in `config/sdk37/notices-*.toml`:
 
 * Eigen is MPL-2.0, built with `EIGEN_MPL2_ONLY`. It is acknowledged in the policy, with the source
