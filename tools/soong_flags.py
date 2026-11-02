@@ -179,24 +179,22 @@ if os.environ.get("RA64_LIBCXX_INCLUDE"):
     STL_CPPFLAGS = ["-nostdinc++", "-isystem", os.environ["RA64_LIBCXX_INCLUDE"]]
 
 
-PROFILES = ("android16", "android15", "android12")
+PROFILES = {"android15": "soong_flags_v", "android12": "soong_flags_s", "android17": "soong_flags_17"}
 
 
 def use_profile(name):
     """Switch the global flag tables to another Soong version: "android16"
-    (the tables above), "android15" (tools/soong_flags_v.py) or "android12"
-    (tools/soong_flags_s.py)."""
+    (the tables above), or a table module from PROFILES."""
     if name in (None, "", "android16"):
         return
     if name not in PROFILES:
-        raise ValueError(f"unknown Soong flag profile {name} (have {', '.join(PROFILES)})")
-    import importlib
-    mod = importlib.import_module({"android15": "soong_flags_v", "android12": "soong_flags_s"}[name])
+        raise ValueError(f"unknown Soong flag profile {name} (have android16, {', '.join(PROFILES)})")
+    mod = __import__(PROFILES[name])
     g = globals()
     for k, v in vars(mod).items():
         if k.isupper():
             if k not in g:
-                raise ValueError(f"{mod.__name__}.{k} does not replace anything in soong_flags")
+                raise ValueError(f"{PROFILES[name]}.{k} does not replace anything in soong_flags")
             g[k] = v
 
 
@@ -392,6 +390,9 @@ def module_flags(gen, c):
     dep_sys = []
     if c.aconfig:
         g = gen.genrule_for(c.name + "{aconfig}")
+        dep_inc += g.include_dirs
+    if c.atomslog:
+        g = gen.genrule_for(c.name + "{atomslog}")
         dep_inc += g.include_dirs
     for lib in c.header_libs + c.whole_static_libs + c.static_libs + c.shared_libs:
         if not gen.is_cc(lib):

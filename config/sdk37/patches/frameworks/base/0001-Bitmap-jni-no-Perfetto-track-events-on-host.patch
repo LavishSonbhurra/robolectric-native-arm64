@@ -1,0 +1,59 @@
+Bitmap JNI: no Perfetto track events on host
+
+Not an upstream commit. Written for this build, from what the official library
+shows.
+
+Why: android-17.0.0_r1 libs/hwui/jni/Bitmap.cpp emits track events through the
+Perfetto C SDK (003157f7d5c2 "Add bitmap tracing", later cb4a15248ece), and
+libperfetto_c and libtracing_perfetto are on libandroid_runtime's host static_libs.
+The official SDK 37 library (CLR2.260407.039) has no Perfetto code at all: none of
+this file's slice names ("Bitmap_writeToParcel", "Bitmap_copyAshmemConfig",
+"bitmap_copy"), no PerfettoTe or track_event strings, and no Perfetto imports.
+So its build of this file has these calls compiled out, by a change we cannot
+see in public history (r1 is the newest public source). Doing the same keeps the
+SDK out of the library. The slices have no consumer on host.
+
+--- a/libs/hwui/jni/Bitmap.cpp
++++ b/libs/hwui/jni/Bitmap.cpp
+@@ -39,6 +39,7 @@
+ #include "android/binder_parcel.h"
+ #endif
+ #include "android_nio_utils.h"
++#ifdef __ANDROID__
+ #include "perfetto/public/abi/track_event_abi.h"
+ #include "perfetto/public/producer.h"
+ #include "perfetto/public/protos/trace/track_event/track_event.pzc.h"
+@@ -46,6 +47,7 @@
+ #include "perfetto/public/te_macros.h"
+ #include "perfetto/public/track_event.h"
+ #include "trace_categories.h"
++#endif
+ 
+ #define DEBUG_PARCEL 0
+ 
+@@ -182,6 +184,7 @@
+ 
+ namespace bitmap {
+ 
++#ifdef __ANDROID__
+ #define PROTO_FIELDS(size, width, height, density, config, is_mutable, pixel_storage_type,         \
+                      bitmap_id)                                                                    \
+     PERFETTO_TE_PROTO_FIELDS(PERFETTO_TE_PROTO_FIELD_NESTED(                                       \
+@@ -225,6 +228,17 @@
+ static void traceSliceEnd(void) {
+     PERFETTO_TE(tracing_perfetto::track_event_categories::bitmap, PERFETTO_TE_SLICE_END());
+ }
++#else
++// No track events on host: the library links neither Perfetto nor libtracing_perfetto.
++static void traceSliceBeginWithGlobalFlow(const char*, uint64_t, int64_t, int32_t, int32_t, int32_t,
++                                          int32_t, bool, int32_t, uint64_t) {}
++static void traceSliceBeginWithGlobalTerminatingFlow(const char*, uint64_t, int64_t, int32_t,
++                                                     int32_t, int32_t, int32_t, bool, int32_t,
++                                                     uint64_t) {}
++static void traceSliceBegin(const char*, uint64_t, int64_t, int32_t, int32_t, int32_t, int32_t,
++                            bool, int32_t) {}
++static void traceSliceEnd(void) {}
++#endif
+ 
+ // Assert that bitmap's SkAlphaType is consistent with isPremultiplied.
+ static void assert_premultiplied(const SkImageInfo& info, bool isPremultiplied) {

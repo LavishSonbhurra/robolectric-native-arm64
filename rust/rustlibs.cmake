@@ -1,5 +1,5 @@
 # librustlibs.a: the Rust part of libandroid_runtime, as one staticlib (Rust
-# std plus every live crate), built with rustc 1.83.0 from the Android.bp
+# std plus every live crate), built with AOSP's rustc from the Android.bp
 # files by tools/bp2rust.py. See docs/NOTES.md, "Rust".
 #
 # Use from the top-level CMakeLists.txt, after AOSP_SRC is set:
@@ -10,8 +10,10 @@
 #   target_link_libraries(android_runtime PRIVATE ... rustlibs)
 #
 # Optional inputs:
-#   RUSTLIBS_RUSTC    rustc 1.83.0 (default: rust/toolchain/bin/rustc, from
+#   RUSTLIBS_RUSTC    rustc (default: rust/toolchain/bin/rustc, from
 #                     rust/install-toolchain.sh)
+#   RUSTLIBS_VERSION  its version, for messages (default: 1.83.0)
+#   RUSTLIBS_GEN_ARGS bp2rust.py arguments for generated crates
 #   RUSTLIBS_HOST_CC  linker driver for host proc macros (default: clang)
 #   RUSTLIBS_JOBS     parallel rustc jobs (default: 2)
 #   RA64_ARCH         target architecture (arm64 or x86_64; the std for a
@@ -42,11 +44,14 @@ endif()
 if(NOT RUSTLIBS_RUSTC)
   set(RUSTLIBS_RUSTC "${CMAKE_CURRENT_LIST_DIR}/toolchain/bin/rustc")
 endif()
+if(NOT RUSTLIBS_VERSION)
+  set(RUSTLIBS_VERSION 1.83.0)
+endif()
 if(NOT EXISTS "${RUSTLIBS_RUSTC}")
-  message(FATAL_ERROR "rustc 1.83.0 not found at ${RUSTLIBS_RUSTC}; run rust/install-toolchain.sh")
+  message(FATAL_ERROR "rustc ${RUSTLIBS_VERSION} not found at ${RUSTLIBS_RUSTC}; run rust/install-toolchain.sh")
 endif()
 if(NOT RUSTLIBS_CXXBRIDGE)
-  message(FATAL_ERROR "set RUSTLIBS_CXXBRIDGE to a cxxbridge 1.0.119 binary before including rustlibs.cmake")
+  message(FATAL_ERROR "set RUSTLIBS_CXXBRIDGE to a cxxbridge binary before including rustlibs.cmake")
 endif()
 if(NOT RUSTLIBS_HOST_CC)
   find_program(RUSTLIBS_HOST_CC clang REQUIRED)
@@ -72,7 +77,7 @@ execute_process(
   COMMAND ${Python3_EXECUTABLE} -I "${CMAKE_CURRENT_LIST_DIR}/../tools/bp2rust.py"
           --out "${RUSTLIBS_DIR}" --rustc "${RUSTLIBS_RUSTC}"
           --cxxbridge "${RUSTLIBS_CXXBRIDGE}" --host-cc "${RUSTLIBS_HOST_CC}"
-          ${_rustlibs_arch}
+          ${_rustlibs_arch} ${RUSTLIBS_GEN_ARGS}
   RESULT_VARIABLE _bp2rust_rc)
 if(NOT _bp2rust_rc EQUAL 0)
   message(FATAL_ERROR "tools/bp2rust.py failed")
@@ -93,10 +98,14 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 add_custom_target(rustlibs_build
   COMMAND "${_rustlibs_ninja}" -C "${AOSP_SRC}" -f "${RUSTLIBS_DIR}/build.ninja" -j ${RUSTLIBS_JOBS}
   BYPRODUCTS "${RUSTLIBS_ARCHIVE}" ${RUSTLIBS_GEN_OUTPUTS}
-  COMMENT "Rust: librustlibs.a (rustc 1.83.0)"
+  COMMENT "Rust: librustlibs.a (rustc ${RUSTLIBS_VERSION})"
   USES_TERMINAL VERBATIM)
 if(RUSTLIBS_CXXBRIDGE_TARGET)
   add_dependencies(rustlibs_build ${RUSTLIBS_CXXBRIDGE_TARGET})
+endif()
+# Generated crates: the tools and generated headers they need.
+if(RUSTLIBS_BUILD_DEPS)
+  add_dependencies(rustlibs_build ${RUSTLIBS_BUILD_DEPS})
 endif()
 
 add_library(rustlibs STATIC IMPORTED GLOBAL)

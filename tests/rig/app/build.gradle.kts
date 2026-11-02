@@ -85,6 +85,14 @@ fun configureRig(test: Test) {
     test.outputs.upToDateWhen { false }
 }
 
+// Espresso for the test classpath. 3.7.0 calls InputManager.getInstance(), which SDK 37 removed,
+// so Compose tests need a 3.8 build there (scripts/run.sh callers pass -Prig.espresso).
+providers.gradleProperty("rig.espresso").orNull?.let { v ->
+    configurations.configureEach {
+        resolutionStrategy.force("androidx.test.espresso:espresso-core:$v")
+    }
+}
+
 dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

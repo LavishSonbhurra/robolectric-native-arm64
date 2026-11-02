@@ -1,0 +1,26 @@
+# Pin for libandroid_runtime.so at SDK 37 (RA64_TARGET=sdk37, see tools/target.py).
+#
+# android-all 17-robolectric-15733970 was built from CLR2.260407.039 (security
+# patch 2026-06-05). android-17.0.0_r1 is the public tag for that release.
+
+[aosp]
+gitiles = "https://android.googlesource.com"
+tag = "android-17.0.0_r1"
+
+[release]
+# cp2a is what aosp_current aliases at this tag. Its RELEASE_BUILD_CLANG_VERSION,
+# clang-r584948b, is the one in the official library's libc++ paths.
+config = "cp2a"
+variant = "user"
+
+[variant]
+os = "linux_glibc"
+arch = "arm64"
+# Soong's global flags as of this tree's build/soong (tools/soong_flags_17.py).
+soong = "android17"
+
+[rust]
+# rust/config/global.go RustDefaultVersion at this tag. The official library
+# carries the same rustc commit (/rustc/01f6ddf7.../library/...).
+version = "1.93.1"
+toolchain = "rust/toolchain-1.93.1"

@@ -498,6 +498,7 @@ CC_TYPES = {
     "cc_library_host_static": "static", "cc_library_host_shared": "shared",
     "cc_library_headers": "headers", "cc_binary": "binary", "cc_binary_host": "binary",
     "cc_object": "object", "cc_aconfig_library": "library", "cc_test_library": "library",
+    "cc_atomslog_library_static": "static",
 }
 
 SKIP_SHARED = {"libc", "libm", "libdl", "libpthread", "librt", "libc++", "libc++_static",
@@ -557,6 +558,19 @@ class Generator:
         self.tools_external = set()  # host tools taken from --host-tools-dir
         import aidl_interface
         aidl_interface.expand(self)
+        self.expand_sysprop_libraries()
+
+    def expand_sysprop_libraries(self):
+        """sysprop/sysprop_library.go: a sysprop_library X gives the cc library
+        libX, compiled from its .sysprop files."""
+        for name, m in list(self.index.modules.items()):
+            if m.type != "sysprop_library":
+                continue
+            _, props = self.res.resolve(name)
+            lib = "lib" + name
+            self.index.modules[lib] = Module(
+                "cc_library_static", {"name": lib, "srcs": props.get("srcs", []), "host_supported": True,
+                                      "static_libs": ["libbase", "liblog"]}, m.dir, m.file, m.line)
 
     # ----- helpers -----
 
@@ -686,6 +700,13 @@ class Generator:
         if mtype == "cc_aconfig_library" and props.get("mode", "production") != "force-read-only":
             # Added by CcAconfigLibraryCallbacks.GeneratorDeps.
             c.shared_libs += ["libaconfig_storage_read_api_cc", "libbase", "liblog"]
+        if mtype == "cc_atomslog_library_static":
+            # atomsapigen/cc_atomslog_library.go GeneratorDeps.
+            c.whole_static_libs.append("stats-log-api-gen-cc-lib")
+            if props.get("include_default_libs") == "headers_only":
+                c.header_libs += ["libstatssocket_headers", "libstatspull_headers"]
+            else:
+                raise GenError(f"{name}: include_default_libs {props.get('include_default_libs')!r} is not supported")
         c.export_header = set(L("export_header_lib_headers"))
         c.export_static = set(L("export_static_lib_headers"))
         c.export_shared = set(L("export_shared_lib_headers"))
@@ -745,6 +766,12 @@ class Generator:
             c.gen_deps.append(gname)
         if c.aconfig:
             gname = name + "{aconfig}"
+            g = self.genrule_for(gname)
+            c.gen_deps.append(gname)
+            gen_srcs.extend(g.sources)
+        c.atomslog = mtype == "cc_atomslog_library_static"
+        if c.atomslog:
+            gname = name + "{atomslog}"
             g = self.genrule_for(gname)
             c.gen_deps.append(gname)
             gen_srcs.extend(g.sources)
@@ -853,6 +880,10 @@ class Generator:
         gdeps = []
         if c.aconfig:
             g = self.genrule_for(name + "{aconfig}")
+            inc += g.include_dirs
+            gdeps.append(g.name)
+        if c.atomslog:
+            g = self.genrule_for(name + "{atomslog}")
             inc += g.include_dirs
             gdeps.append(g.name)
         for lib in c.header_libs:
@@ -1173,14 +1204,23 @@ def emit(gen, order, out_dir):
         if c.kind == "binary":
             libs = link_closure(gen, name)
             items = []
+            # Host tools that need every object of a whole_static_libs entry
+            # (static registration), named in the overrides.
+            whole_archive = gen.cfg.module_override(name).get("whole_archive", [])
             for kind, d in libs:
-                if kind == "cc":
+                if kind == "cc" and d in whole_archive:
+                    items += ["-Wl,--whole-archive", tid(d), "-Wl,--no-whole-archive"]
+                elif kind == "cc":
                     items.append(tid(d))
                 elif kind == "external":
                     ov = gen.cfg.module_override(d)
                     items += [ov["target"]] if ov.get("target") else list(ov["link"])
                 else:
                     raise GenError(f"{name}: host tool with a Rust dependency {d} is not supported")
+            # MinimalRuntimeDep, as in emit_shared_link().
+            if any(soong_flags.sanitizers(gen.cc[d])[0] and soong_flags.sanitizers(gen.cc[d])[1]
+                   for kind, d in libs if kind == "cc"):
+                items.append("${RA64_UBSAN_MINIMAL_RUNTIME}")
             ldlibs = [x for x in c.host_ldlibs] + ["-ldl", "-lpthread", "-lm", "-lrt"]
             lines.append(f"target_link_libraries({t} PRIVATE -Wl,--start-group {' '.join(items)} "
                          f"-Wl,--end-group {' '.join(ldlibs)})")

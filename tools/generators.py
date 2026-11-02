@@ -29,6 +29,8 @@ def make(gen, name):
         kind, _, arg = rest.partition(":")
         if kind == "aconfig":
             return aconfig_cc(gen, base, name)
+        if kind == "atomslog":
+            return atomslog_cc(gen, base, name)
         if kind == "sysprop":
             return sysprop_cc(gen, base, arg, name)
         if kind == "yacc_lex":
@@ -44,6 +46,8 @@ def make(gen, name):
     mtype, props = gen.res.resolve(name)
     if mtype in ("genrule", "cc_genrule"):
         return genrule(gen, name, m, props)
+    if mtype == "gensrcs":
+        return gensrcs(gen, name, m, props)
     if mtype == "aidl_gen":
         return aidl_gen(gen, name, props)
     raise GenError(f"{name} ({m.where()}): unsupported generator module type {mtype}")
@@ -115,6 +119,31 @@ def aconfig_cc(gen, lib, gname):
     g.include_dirs = [os.path.join(d, "include")]
     g.inputs = decls + values
     g.tools = [ACONFIG_TARGET]
+    return g
+
+
+# ---- cc_atomslog_library_static (atomsapigen/cc_atomslog_library.go) --------
+
+def atomslog_cc(gen, lib, gname):
+    """stats-log-api-gen run twice, for the header and the source."""
+    _, props = gen.res.resolve(lib)
+    tool = host_tool(gen, "stats-log-api-gen")
+    d = gen.gendir(lib)
+    basename = props["basename"]
+    ns = props["namespace"]
+    module = ["--module", props["atoms_module"]] if props.get("atoms_module") else []
+    hdr = os.path.join(d, "include", basename + ".h")
+    cpp = os.path.join(d, basename + ".cpp")
+    g = Gen(gname, "atomslog")
+    g.commands = [[gen.cfg.vars["cmake"], "-E", "make_directory", os.path.dirname(hdr)],
+                  [tool[0], "--header", hdr, "--namespace", ns, "--omitExtraSrcs", *module],
+                  [tool[0], "--cpp", cpp, "--namespace", ns, "--importHeader", basename + ".h",
+                   "--omitExtraSrcs", *module]]
+    g.outputs = [cpp, hdr]
+    g.sources = [cpp]
+    g.headers = [hdr]
+    g.include_dirs = [os.path.dirname(hdr)]
+    g.tools = [t for t in [tool[1]] if t]
     return g
 
 
@@ -250,6 +279,10 @@ def genrule(gen, name, m, props):
     def subst(text):
         text = text.replace("$$", "\0DOLLAR\0")
         text = re.sub(r"\$\((location|locations)(?:\s+([^)]*))?\)", loc, text)
+        # abseil's *_hdrs rules: the layout in genDir is the path as given,
+        # and Soong's paths are relative to the source root (our working dir).
+        if "cp --parents $(in)" in text:
+            text = text.replace("$(in)", " ".join(shlex.quote(os.path.relpath(s, SRC)) for s in srcs))
         text = text.replace("$(in)", " ".join(shlex.quote(s) for s in srcs))
         text = text.replace("$(out)", " ".join(shlex.quote(o) for o in outs))
         text = text.replace("$(genDir)", shlex.quote(d))
@@ -267,6 +300,45 @@ def genrule(gen, name, m, props):
     eid = props.get("export_include_dirs")
     g.include_dirs = [os.path.join(d, x) for x in eid] if eid else [d]
     g.inputs = srcs + list(tool_files.values())
+    g.tools = tool_targets
+    return g
+
+
+def gensrcs(gen, name, m, props):
+    """genrule/genrule.go NewGenSrcs: `cmd` once per source, the output next
+    to the source's path under the generator's directory, with its extension
+    replaced by output_extension."""
+    g = Gen(name, "gensrcs")
+    d = gen.gendir(name)
+    ext = props["output_extension"]
+    tools = {}
+    tool_targets = []
+    for t in props.get("tools", []):
+        path, target = host_tool(gen, t)
+        tools[t] = path
+        if target:
+            tool_targets.append(target)
+    cmds = []
+    for src in expand_globs(m.dir, props.get("srcs", []), props.get("exclude_srcs", []), name):
+        rel = os.path.relpath(src, os.path.join(SRC, m.dir))
+        out = os.path.join(d, os.path.splitext(rel)[0] + "." + ext)
+        cmd = props.get("cmd", "")
+        cmd = re.sub(r"\$\(location\s+([^)]*)\)", lambda mt: tools[mt.group(1).strip()], cmd)
+        cmd = cmd.replace("$(location)", next(iter(tools.values())))
+        cmd = cmd.replace("$(in)", shlex.quote(src)).replace("$(out)", shlex.quote(out))
+        if re.search(r"\$\(", cmd):
+            raise GenError(f"{name}: unsupported gensrcs substitution in {cmd!r}")
+        cmds.append([gen.cfg.vars["cmake"], "-E", "make_directory", os.path.dirname(out)])
+        cmds.append(f"rm -f {shlex.quote(out)}")
+        cmds.append(cmd)
+        g.outputs.append(out)
+        g.inputs.append(src)
+    g.commands = cmds
+    g.workdir = SRC
+    g.sources = [o for o in g.outputs if os.path.splitext(o)[1] in (".c", ".cc", ".cpp", ".cxx", ".S", ".s")]
+    g.headers = [o for o in g.outputs if o not in g.sources]
+    eid = props.get("export_include_dirs")
+    g.include_dirs = [os.path.normpath(os.path.join(d, x)) for x in eid] if eid else [d]
     g.tools = tool_targets
     return g
 
