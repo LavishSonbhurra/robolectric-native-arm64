@@ -317,7 +317,7 @@ native, and `ShadowNativeTableMaskFilterTest` cannot create its test runner, on 
   nativegraphics and ctesque; for SDK 35, nativegraphics and ctesque only, so **robotests were not compared
   per test**; for SDK 37, **only an 81-class subset** of robotests plus nativegraphics and ctesque.
 * The x86_64 control build, which shows whether the build recipe matches Google's pixel for pixel, is done
-  for SDK 36 and 26 to 34. It is not finished for SDK 35 and does not exist for SDK 37.
+  for SDK 26 to 36. For SDK 35 it matches on all 37 images and 3 text files. It does not exist for SDK 37.
 * SDK 37 `MotionPredictor` loads, but no test runs TensorFlow Lite inference with a real model.
 * 7 robotests files need compileSdk 37, so they do not run at any SDK.
 * The suites at SDK 30 and 34 did not run through the `4.17-1` loader. The rig did. Full suite runs for SDK

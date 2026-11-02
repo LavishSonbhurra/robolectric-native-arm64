@@ -149,6 +149,16 @@ ours, the behaviour is taken from the binary. The real commit is not public.
 minikin `e5c9cf7`, `b9de9b2`, `4066fcd`, `736e80b`, native `4ec75f112`, `99510a271`, `ce4d63616`
 and libnativehelper `a16d4b5` are for Mac or Windows, or change no generated code.
 
+### Found by the string audit and not applied yet
+
+Skia `d7c30a790` (Remove log spam about Perfetto being unavailable in Android host builds,
+2024-11-12) deletes one `SkDebugf`. The official library does not have that string, so it has this
+commit or an equivalent. This build still prints `Tracing Skia with Perfetto is not supported in
+this environment (host build?)` from `Properties.cpp`: on 4 lines of the arm64 nativegraphics and
+ctesque log, 0 lines of the same suites on Google's library. It goes to the log only. Results here are for the
+library without the commit. Applying it changes the library, so the rig and suites would have to
+run again.
+
 ## Toolchain
 
 The tree's Soong (android-15.0.0_r1) differs from SDK 36's in `tools/soong_flags_v.py`:
@@ -186,11 +196,17 @@ Crates are separate projects under `external/rust/crates` at this tag. `libcxxbr
   `ImageDecoder.nCreateFd` and `Image.nativeGetFenceFd` do not work on host. This build matches
   that.
 * 1,299 JNI methods against 1,328.
+* Fatal checks: both official libraries have calls to
+  `__android_log_call_aborter("Fatal Error")` with no message, 812 sites at SDK 35 and 317 at SDK 36.
+  At SDK 36 this was `core/jni` only (docs/rng-audit.md). At SDK 35 hwui has it too: `Already have an
+  AnimationHandle!` is in the official SDK 36 library and not in the SDK 35 one.
 * `platform_sdk_version` 35, release config `ap3a`, Rust 1.78.0 against 1.83.0, C gnu17.
 
 ## Results
 
-Numbers are from the logs of the build with library SHA-256 `1aea79a5fba64fb53e7786e8b33024161ef047337595d52f3629f738eff7772b`.
+Numbers are from the logs of the build with library SHA-256
+`1aea79a5fba64fb53e7786e8b33024161ef047337595d52f3629f738eff7772b`. The x86_64 control library is
+`5db6a6ab250ab6f0180b28096768af09b13c0ac83ad5fc91aa8b48dc13f606ea`, same sources and flags.
 
 ### Library
 
@@ -202,8 +218,44 @@ Numbers are from the logs of the build with library SHA-256 `1aea79a5fba64fb53e7
 * All class names in the registration maps match the official library.
 * `rust/check-live.py`: every non-std Rust source file and marker live in the official library is
   present.
-* Strings: arm64 against x86_64, so most differences are compiler output (lambda names, inlining).
-  What is left is listed under "Not verified".
+* The x86_64 control library has the same JNI result (1,299 methods, identical), 223 of 223 exports
+  and passes `rust/check-live.py`.
+
+### Strings, x86_64 against x86_64
+
+`tools/audit/strdiff.py`, our x86_64 control library against the official one.
+
+Only in ours, 1,208 strings:
+
+| Count | What |
+| --- | --- |
+| 715 | evdev labels (`ABS_*`, `KEY_*` and so on) from `toolbox_input_labels`. Same as SDK 36, item 3 of the differences in docs/rng-audit.md |
+| 163 | mangled and type names |
+| 31 | fragments of 7 characters or fewer |
+| 8 | Rust paths and panic text |
+| 291 | the rest, below |
+
+Of the 291, 198 are direct arguments of `LOG_ALWAYS_FATAL` or `LOG_ALWAYS_FATAL_IF` in hwui and
+`core/jni`. 22 are the `com.android.input.flags` names, all 22 in `input_flags.aconfig` (the same
+SDK 36 item). 24 are from libc++abi's demangler. The other 47 are mostly fatal-check conditions, log
+tags and merged fragments, read by eye and not classified one by one. Two of them need a word:
+
+* `Tracing Skia with Perfetto...`: a missing commit, see "Found by the string audit".
+* `%s: No JPEG/HEIC header detected, defaulting to size=width=%d` is an `ALOGW`, not a fatal check,
+  in `Image_getBlobSize`. Not explained. The official ImageReader was a hand port, so its version of
+  this code is not known.
+
+Only in the official library, 233 strings: 155 mangled and type names (lambda types, compiler
+output), 24 `ubsan:` messages, 8 Rust, 6 short, and 40 others:
+
+* `Fatal Error`, the message-less fatal checks.
+* The DisplayViewport group (`isActive`, `logicalFrame`, `physicalPort` and so on), the dead code
+  listed under "Not verified".
+* libc++abi messages (`cannot allocate __cxa_eh_globals` and so on): toolchain.
+* Eight class names such as `android.os.Binder`. Our source table has them, but they are not stored
+  as whole strings in our binary, so this comparison cannot see them. The JNI tables are identical.
+* `Failed to generate random bytes for id`, not explained. See "Not verified".
+* Strings that the linker merged differently.
 
 ### Fidelity rig
 
@@ -218,6 +270,22 @@ pass).
   865 pixels. They are single levels on anti-aliased glyph edges. Layout and shapes are the same.
 
 `tests/rig/baseline/arm64-sdk35.json` holds the ceilings.
+
+x86_64 control: our x86_64 library, from the same sources and flags, loaded through the plugin on
+the x86_64 JDK 17 under qemu, the same JDK as the goldens (`x86-via-loader` with `RIG_X86_LIB`).
+33 tests pass. 37 of 37 images and 3 of 3 text files are identical to the goldens, max delta 0.
+
+What that shows:
+
+* The sources, patches and build flags reproduce Google's output on x86_64 for everything the rig
+  covers, so none of them explains the 13 arm64 differences. That includes the four `view-*` images.
+* The 13 differences appear only when the configuration changes from x86_64 under qemu to native
+  arm64.
+
+What it does not show: which part of that change causes them. Skia's NEON paths are the likely
+cause, as measured at SDK 36, but this run changes other things together: compiler output for the
+architecture, the JVM, and the glibc `libm` (the qemu sysroot's against the host's). The rig also
+covers only these 40 outputs.
 
 ### Robolectric suites
 
@@ -266,17 +334,16 @@ list, so this is the same as with Google's library.
 
 ## Not verified
 
-* **No x86_64 control build.** SDK 36 proved that its pixel differences come from Skia's NEON paths
-  by building the same sources for x86_64 and matching the goldens exactly. That build was started
-  here and stopped at step 313 of 2,118 by a time limit, most of which went to waiting for the
-  shared build lock. So the 13 differing images are not proven to be NEON differences. Nine match
-  SDK 36 to the pixel. The four `view-*` images are new and are explained only by what they look
-  like.
-* **String audit is arm64 against x86_64.** It is noisier than an x86_64 comparison and it can hide
-  small differences in strings the compiler splits differently.
-* Two strings are in the official library and not here: `Failed to generate random bytes for id` and
-  `Fatal Error`. Both are also in the official SDK 36 library and not in our SDK 36 build, and
-  neither is in the AOSP sources in the closure, so they come from Google's toolchain or runtime.
+* The cause of the 13 arm64 image differences is narrowed down to the arm64 configuration, not to
+  one code path. See "Fidelity rig".
+* `d7c30a790`: the library tested here does not have it, see "Found by the string audit".
+* The message-less fatal checks are not reproduced, because the change is not public. From the
+  sources it should only remove text from fatal aborts, but that is not measured. The official
+  library has 1,272 fatal call sites (812 + 460) and ours 1,156 (1 + 1,155). Compiler inlining can
+  change those totals, so they neither confirm nor rule out that the same checks abort.
+* `Failed to generate random bytes for id` is in both official libraries and in no source searched
+  here. Its origin is unknown.
+* `No JPEG/HEIC header detected` is only in ours and is not explained.
 * The official library contains `register_android_hardware_display_DisplayViewport` although
   nothing calls it (no call site, no stored pointer). It is dead code from a host source list, left
   out here. It cannot change behaviour.
@@ -284,4 +351,5 @@ list, so this is the same as with Google's library.
 * **robotests against Google's library.** The 15 known failures were compared with Google's library
   for nativegraphics and ctesque only. robotests was not compared per test, because it is too slow
   under qemu here.
+* The suites were not run on the x86_64 control library.
 * Tests ran on one arm64 VM with one glibc.
