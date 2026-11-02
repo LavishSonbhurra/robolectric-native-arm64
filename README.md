@@ -30,8 +30,8 @@ Robolectric project. "Android" is a trademark of Google LLC.
   `robolectric-nativeruntime-compat-linux-aarch64-x86pixels`, renders exactly like the x86_64 library
   under qemu. See [docs/COMPAT.md](docs/COMPAT.md). Not covered: SDK 37. SDK 35 is untested.
 * Released on GitHub:
-  [v4.17-16-robolectric-13921718-2](https://github.com/LavishSonbhurra/robolectric-native-arm64/releases/tag/v4.17-16-robolectric-13921718-2)
-  (loader `-2` with the SDK 36 library, and the two compat jars `1.0.19-1`), built and attested by CI
+  [v4.17-16-robolectric-13921718-3](https://github.com/LavishSonbhurra/robolectric-native-arm64/releases/tag/v4.17-16-robolectric-13921718-3)
+  (loader `-3` with the SDK 36 library, and the two compat jars `1.0.19-2`), built and attested by CI
   on GitHub's arm64 runners. Publishing to Maven Central comes later.
 
 ## Quick start
@@ -42,7 +42,7 @@ Coordinates:
 | --- | --- |
 | Group | `io.github.lavishsonbhurra` |
 | Artifact | `robolectric-nativeruntime-linux-aarch64` |
-| Version | `4.17-16-robolectric-13921718-2` (Robolectric, android-all build, revision) |
+| Version | `4.17-16-robolectric-13921718-3` (Robolectric, android-all build, revision) |
 
 Until the artifact is on Maven Central, download the jar from the
 [GitHub releases](https://github.com/LavishSonbhurra/robolectric-native-arm64/releases) and use it as a
@@ -52,13 +52,13 @@ file dependency.
 dependencies {
     testImplementation("org.robolectric:robolectric:4.17")
     // Inert on every platform except Linux aarch64.
-    testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-linux-aarch64:4.17-16-robolectric-13921718-2")
+    testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-linux-aarch64:4.17-16-robolectric-13921718-3")
     // For tests at SDK 26 to 34. For x86-identical pixels use
     // robolectric-nativeruntime-compat-linux-aarch64-x86pixels instead.
-    testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-compat-linux-aarch64:1.0.19-1")
+    testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-compat-linux-aarch64:1.0.19-2")
     // Before Maven Central, use the release jars as files:
-    // testRuntimeOnly(files("libs/robolectric-nativeruntime-linux-aarch64-4.17-16-robolectric-13921718-2.jar"))
-    // testRuntimeOnly(files("libs/robolectric-nativeruntime-compat-linux-aarch64-1.0.19-1.jar"))
+    // testRuntimeOnly(files("libs/robolectric-nativeruntime-linux-aarch64-4.17-16-robolectric-13921718-3.jar"))
+    // testRuntimeOnly(files("libs/robolectric-nativeruntime-compat-linux-aarch64-1.0.19-2.jar"))
 }
 
 tasks.withType<Test>().configureEach {
@@ -202,10 +202,11 @@ to be displayed with binary redistributions:
 
 * This product includes DNG technology under license by Adobe Systems Incorporated.
 * This product includes Gain Map technology under license by Adobe.
+* This product includes software derived from the RSA Data Security, Inc. MD5 Message-Digest Algorithm.
 * This software is based in part on the work of the Independent JPEG Group.
 * This software is based in part on the work of the FreeType Team. Portions of this software are
-  copyright (c) 2023 The FreeType Project (www.freetype.org). All rights reserved. FreeType is used under
-  the FreeType License.
+  copyright (c) 2023 The FreeType Project (www.freetype.org) in the SDK 36 library and copyright (c) 2020
+  in the compat library. All rights reserved. FreeType is used under the FreeType License.
 
 The library includes Adobe's DNG SDK, which is distributed under the DNG SDK License Agreement. Among its
 terms, a party that distributes the software in a commercial product agrees to indemnify Adobe against

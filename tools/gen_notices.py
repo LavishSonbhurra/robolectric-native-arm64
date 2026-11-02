@@ -17,8 +17,9 @@ is linked:
     `in_staticlib` = yes), resolved the same way from their directories;
   * config/notices-extra.toml for what Android.bp does not describe: the C++
     runtime, compiler-rt, libgcc and glibc objects from the sysroot, the Rust
-    standard library, extra texts for some AOSP components and the
-    attribution sentences some licences require;
+    standard library, extra texts for some AOSP components (whole files, or
+    excerpts of source files whose licence notice sits inside the code),
+    notes for readers and the attribution sentences some licences require;
   * config/notices-policy.toml: the licence kinds that may appear, and a
     written reason for every component AOSP marks "by exception only".
 
@@ -129,6 +130,19 @@ def sha(text):
 
 
 PLACEHOLDER = re.compile(r"\{([a-z_]+)\}")
+
+
+def excerpt(body, begin, end):
+    """The lines from the first one containing `begin` through the next one
+    containing `end`, or None if either is missing."""
+    lines = body.splitlines()
+    for i, line in enumerate(lines):
+        if begin in line:
+            for j in range(i, len(lines)):
+                if end in lines[j]:
+                    return "\n".join(x.rstrip() for x in lines[i:j + 1]) + "\n"
+            return None
+    return None
 
 
 def expand(pattern, vars_, problems, where):
@@ -318,13 +332,16 @@ def main():
     supplements = {}
     for s in extra_cfg.get("supplement", []):
         supplements.setdefault(s["license"], []).append(s)
+    notes = {}
+    for x in extra_cfg.get("note", []):
+        notes.setdefault(x["license"], []).append(x["text"])
 
     entries = []
     for c in sorted(comps.values(), key=lambda c: (c["dir"], c["id"])):
         files = []
         paths = [os.path.join(c["dir"], t) for t in c["texts"]]
         for s in supplements.get(c["id"], []):
-            paths += s["files"]
+            paths += s.get("files", [])
         for rel in paths:
             p = os.path.join(a.src, rel)
             body = read_text(p)
@@ -333,6 +350,16 @@ def main():
                 continue
             read_files.add(os.path.abspath(p))
             files.append({"path": rel, "sha256": sha(body), "text": body})
+        for s in supplements.get(c["id"], []):
+            for x in s.get("excerpts", []):
+                p = os.path.join(a.src, x["file"])
+                body = read_text(p)
+                part = excerpt(body, x["begin"], x["end"]) if body is not None else None
+                if part is None:
+                    problems.append(f"{c['id']}: no licence notice between {x['begin']!r} and {x['end']!r} in {x['file']}")
+                    continue
+                read_files.add(os.path.abspath(p))
+                files.append({"path": f"{x['file']} (notice in the source)", "sha256": sha(part), "text": part})
         if not files:
             problems.append(f"{c['id']}: no licence text")
         for k in c["kinds"]:
@@ -342,7 +369,7 @@ def main():
             problems.append(f"{c['id']}: 'by exception only' licence needs an [[acknowledged]] entry in the policy")
         entries.append({"id": c["id"], "title": c["id"], "source": c["dir"], "licenses": c["kinds"], "covers": c["modules"],
                         "sources_compiled": c["sources_compiled"], "files": files,
-                        "note": acked.get(c["id"])})
+                        "note": " ".join(n for n in [acked.get(c["id"]), *notes.get(c["id"], [])] if n) or None})
 
     # Extra components (toolchain and sysroot parts).
     matched_archives = set()
@@ -408,6 +435,10 @@ def main():
             attributions.append(x["text"])
         elif x["license"] not in lic and x["license"] not in extra_ids:
             problems.append(f"attribution for unknown licence {x['license']}")
+
+    for name in notes:
+        if name not in lic and name not in extra_ids:
+            problems.append(f"note for unknown licence {name}")
 
     # NOTICE: summary of components, then each distinct text once.
     out = []

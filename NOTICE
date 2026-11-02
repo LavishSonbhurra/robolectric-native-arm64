@@ -12,10 +12,11 @@ It builds on the work of others:
   files in patches/ are changes from later AOSP commits, under the license of the files
   they modify (Apache License 2.0).
 
-* Robolectric (https://robolectric.org), Apache License 2.0. The loader plugin implements
+* Robolectric (https://robolectric.org), MIT License. The loader plugin implements
   Robolectric's NativeRuntimeLoader plugin interface and follows the logic of Robolectric's
-  DefaultNativeRuntimeLoader. The upstream test harness runs Robolectric's own test
-  suites, which are downloaded at test time.
+  DefaultNativeRuntimeLoader; Robolectric's license is in loader/LICENSE-robolectric.txt
+  and in the loader jar. The upstream test harness runs Robolectric's own test suites,
+  which are downloaded at test time.
 
 * The LLVM Project (libc++, libc++abi, libunwind, compiler-rt; Apache License 2.0 with
   LLVM exceptions), the Rust project (standard library; MIT or Apache License 2.0), the
@@ -25,7 +26,7 @@ It builds on the work of others:
 This project is not affiliated with, endorsed by or supported by Google or the Robolectric
 project. Android is a trademark of Google LLC.
 
-The compiled libandroid_runtime.so contains code under many licenses. Its complete
-notices are generated at build time by cmake/notices.cmake (tools/gen_notices.py) into
-lib/NOTICE next to the library, and are shipped as THIRD_PARTY_NOTICES with every release.
+The compiled libraries contain code under many licenses. Their complete notices are
+generated at build time by cmake/notices.cmake (tools/gen_notices.py) into lib/NOTICE next
+to each library, and are shipped as THIRD_PARTY_NOTICES with every release.
 See docs/LICENSING.md.

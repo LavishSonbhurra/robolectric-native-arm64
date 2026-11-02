@@ -20,7 +20,7 @@ plugins {
 }
 
 group = "io.github.lavishsonbhurra"
-version = "4.17-16-robolectric-13921718-2"
+version = "4.17-16-robolectric-13921718-3"
 
 val artifactName = "robolectric-nativeruntime-linux-aarch64"
 // The loader reflects into this Robolectric release; see DefaultNativeRuntimeLoader.
@@ -135,7 +135,9 @@ publishing {
                         "Robolectric $robolectricVersion SDK 36 (android-all 16-robolectric-13921718), " +
                         "and a NativeRuntimeLoader plugin that loads it. Unofficial; not affiliated " +
                         "with Google or the Robolectric project. Library sources: the AOSP tag plus " +
-                        "the build scripts in the project repository.",
+                        "the build scripts in the project repository. This product includes DNG " +
+                        "technology under license by Adobe Systems Incorporated. This product " +
+                        "includes Gain Map technology under license by Adobe.",
                 )
                 url.set("https://github.com/LavishSonbhurra/robolectric-native-arm64")
                 licenses {

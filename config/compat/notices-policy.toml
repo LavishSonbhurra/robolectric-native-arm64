@@ -54,8 +54,11 @@ id = "external_skia_license"
 reason = """Skia is BSD-3-Clause. The MPL kind comes from the GIF decoder
 (third_party/libgifcodec/SkGifImageReader.cpp, compiled), which is triple
 licensed MPL 1.1 / GPL 2.0 / LGPL 2.1 and is used here under the MPL 1.1, as in
-Google's own build of this library. The MPL covers those files only; their
-source is the pinned Skia tree, and the licence block is in this NOTICE."""
+Google's own build of this library. The MPL covers those files only, and they
+are not modified. Their source: third_party/libgifcodec in
+https://android.googlesource.com/platform/external/skia at commit
+fb4d3cffc9f16223fd0d462c4eac11e5a2583318. The licence block is in this NOTICE;
+the MPL 1.1 text is at https://www.mozilla.org/MPL/1.1/ ."""
 
 [[acknowledged]]
 id = "external_harfbuzz_ng_license"

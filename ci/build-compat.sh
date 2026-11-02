@@ -73,6 +73,9 @@ group "checks"
 # No version script: the official library exports everything (13,610 symbols). The floor is the
 # sysroot's glibc; the official library needs GLIBC_2.14 at most, ours 2.29.
 python3 -I toolchain/check-so.py --floor 2.31 "$LIB"
+python3 -I tools/check_notice_holders.py --src src-compat --closure "$BUILD/cmake-gen/closure.json" \
+  --module librobolectric-nativeruntime --archives "$BUILD/notices/librobolectric-nativeruntime/archives.tsv" \
+  --why-extract "$BUILD/notices/librobolectric-nativeruntime/why-extract.tsv" --notice "$BUILD/lib/NOTICE"
 endgroup
 
 group "dist"

@@ -15,7 +15,10 @@
 #   {rustlibs} (librustlibs.a). Check the names and versions here whenever a
 #   pin in those scripts changes.
 # [[supplement]]: more texts for an AOSP licence module, by its name; paths
-#   are relative to src/.
+#   are relative to src/. excerpts takes a licence notice out of a source file:
+#   {file, begin, end}, the lines from the first one containing begin through
+#   the next one containing end (a problem if they are not there).
+# [[note]]: a sentence for readers of an AOSP licence module's entry, by name.
 # [[attribution]]: a sentence a licence requires in the documentation, printed
 #   at the top of the NOTICE file when that component is in the library.
 
@@ -31,23 +34,24 @@ files = ["{runtimes}/share/licenses/compiler-rt/LICENSE.TXT"]
 [[component]]
 id = "libgcc"
 name = "GCC 10 runtime (Debian 11 libgcc-10-dev 10.2.1-6)"
-what = "crtbeginS.o, crtendS.o and libgcc.a (-static-libgcc)"
+what = "crtbeginS.o, crtendS.o, libgcc.a and libgcc_eh.a (-static-libgcc)"
 origin = "Debian bullseye gcc-10"
 spdx = ["GPL-3.0-or-later WITH GCC-exception-3.1"]
 archives = ["{sysroot}/usr/lib/gcc/*/10/libgcc.a", "{sysroot}/usr/lib/gcc/*/10/libgcc_eh.a"]
 objects = ["{sysroot}/usr/lib/gcc/*/10/crt*.o"]
 files = ["{sysroot}/usr/share/doc/libgcc-10-dev/copyright", "{sysroot}/usr/share/common-licenses/GPL-3"]
-note = "The GCC Runtime Library Exception 3.1 (in the text) permits linking this code into the library under its own terms."
+note = """The GCC Runtime Library Exception 3.1 (in the text) permits linking this code into the library under its own terms. The GPL-3 text is included only because the exception is an additional permission to it; no GPL-covered program is linked. The Debian copyright file below covers the whole gcc-10 source package: it also lists licences of parts that are not linked here (GPL front ends, LGPL libraries, newlib's BSD licences with advertising clauses), and those do not apply to this library."""
 
 [[component]]
 id = "glibc"
 name = "GNU C Library 2.31 (Debian 11 libc6-dev 2.31-13+deb11u11)"
-what = "crti.o, crtn.o and libc_nonshared.a (fstat, pthread_atfork); glibc itself is linked dynamically"
+what = "crti.o, crtn.o and libc_nonshared.a (stat64, fstat64, lstat64); glibc itself is linked dynamically"
 origin = "Debian bullseye glibc"
 spdx = ["LGPL-2.1-or-later"]
 archives = ["{sysroot}/usr/lib/*/libc_nonshared.a"]
 objects = ["{sysroot}/usr/lib/*/crt[in].o"]
 files = ["{sysroot}/usr/share/doc/libc6-dev/copyright", "{sysroot}/usr/share/common-licenses/LGPL-2.1"]
+note = """Only the objects named above are linked statically; glibc itself is used as a shared library. Corresponding source: Debian source package glibc 2.31-13+deb11u11, https://snapshot.debian.org/package/glibc/2.31-13%2Bdeb11u11/ . To relink this library with changed versions of these objects, rebuild it from the public build recipe at the matching release tag of https://github.com/LavishSonbhurra/robolectric-native-arm64 . The Debian copyright file below covers the whole glibc source package (its header still says version 2.23): it also lists licences of parts that are not linked here, such as GPL utilities and other libraries, and those do not apply to this library."""
 
 [[supplement]]
 license = "external_libjpeg-turbo_license"
@@ -59,9 +63,65 @@ license = "external_skia_license"
 files = ["external/skia/third_party/libgifcodec/LICENSE.md"]
 reason = "The MPL 1.1 / GPL 2.0 / LGPL 2.1 licence block of the GIF decoder (SkGifImageReader.cpp, compiled); Skia's LICENSE and NOTICE do not cover it."
 
+[[supplement]]
+license = "external_dng_sdk_license"
+excerpts = [
+  {file = "external/dng_sdk/source/dng_fingerprint.cpp", begin = "Derived from the RSA Data Security, Inc. MD5 Message-Digest Algorithm", end = "documentation and/or software."},
+  {file = "external/dng_sdk/source/dng_lossless_jpeg.cpp", begin = "Copyright (C) 1991, 1992, Thomas G. Lane.", end = "PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS."},
+]
+reason = "Notices that the DNG SDK's NOTICE and LICENSE files do not carry, in two compiled sources."
+
+[[supplement]]
+license = "external_skia_license"
+files = ["external/skia/third_party/skcms/LICENSE"]
+excerpts = [
+  {file = "external/skia/src/sksl/spirv.h", begin = "Copyright (c) 2014-2016 The Khronos Group Inc.", end = "IN THE MATERIALS."},
+]
+reason = "skcms and the Khronos SPIR-V headers are compiled; Skia's LICENSE and NOTICE do not cover them."
+
+[[note]]
+license = "external_dng_sdk_license"
+text = "AOSP's licence module also lists the Apache-2.0 and MIT kinds; the terms that ship with this code are the agreement and notices printed for this entry."
+
+[[note]]
+license = "external_freetype_license"
+text = "The files printed for this entry are the licence files of the whole FreeType project, including GPL files of build scripts that are not compiled."
+
+[[note]]
+license = "external_icu_license"
+text = "The ICU licence files cover the whole ICU project, including data and build files that are not in this library (for example the IPADIC dictionary conditions, GPL autoconf files and EPL test data). Only ICU code is linked, with no ICU data."
+
+[[note]]
+license = "external_libjpeg-turbo_license"
+text = "The Beerware kind comes from md5/md5hl.c, a test helper that is not compiled."
+
+[[note]]
+license = "external_libjpeg-turbo_license"
+text = "Source files also name these copyright holders: Arm Limited; Linaro Limited; MIPS Technologies, Inc., California; MIYASAKA Masaru; Matthias Räncker; Matthieu Darbois; Pierre Ossman for Cendio AB."
+
+[[note]]
+license = "external_libpng_license"
+text = "Source files also name Arm Holdings as a copyright holder."
+
+[[note]]
+license = "external_harfbuzz_ng_license"
+text = "Source files also name these copyright holders: Ebrahim Byagowi; Grigori Goronzy."
+
+[[note]]
+license = "external_zlib_license"
+text = "Chromium's files in this project (adler32_simd.c, crc32_simd.c, cpu_features.c and others) are under the Chromium BSD licence, printed in system/libbase/NOTICE."
+
+[[note]]
+license = "frameworks_base_license"
+text = "The CC-BY kind comes from documentation that is not compiled."
+
 [[attribution]]
 license = "external_dng_sdk_license"
 text = "This product includes DNG technology under license by Adobe Systems Incorporated."
+
+[[attribution]]
+license = "external_dng_sdk_license"
+text = "This product includes software derived from the RSA Data Security, Inc. MD5 Message-Digest Algorithm."
 
 [[attribution]]
 license = "external_libjpeg-turbo_license"
@@ -70,5 +130,5 @@ text = "This software is based in part on the work of the Independent JPEG Group
 [[attribution]]
 license = "external_freetype_license"
 text = """This software is based in part on the work of the FreeType Team.
-Portions of this software are copyright (c) 2023 The FreeType Project (www.freetype.org).
+Portions of this software are copyright (c) 2020 The FreeType Project (www.freetype.org).
 All rights reserved."""

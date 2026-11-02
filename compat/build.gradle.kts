@@ -28,7 +28,7 @@ plugins {
 }
 
 group = "io.github.lavishsonbhurra"
-version = "1.0.19-1"
+version = "1.0.19-2"
 
 val x86Pixels = project.name == "compat-x86pixels"
 val artifactName =
@@ -95,6 +95,7 @@ tasks.withType<Jar>().configureEach {
     isReproducibleFileOrder = true
     metaInf {
         from(rootProject.layout.projectDirectory.file("LICENSE"))
+        from(rootProject.layout.projectDirectory.file("NOTICE"))
     }
 }
 
@@ -126,7 +127,8 @@ publishing {
                         (if (x86Pixels) ", with Skia's x86 code paths so that images match the x86_64 build" else "") +
                         ". Load it with the plugin in " +
                         "robolectric-nativeruntime-linux-aarch64. Unofficial; not affiliated with " +
-                        "Google or the Robolectric project.",
+                        "Google or the Robolectric project. This product includes DNG technology " +
+                        "under license by Adobe Systems Incorporated.",
                 )
                 url.set("https://github.com/LavishSonbhurra/robolectric-native-arm64")
                 licenses {

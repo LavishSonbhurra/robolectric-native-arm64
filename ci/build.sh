@@ -69,6 +69,9 @@ endgroup; lap build
 group "checks"
 # The link already runs check-so.py; running it again here makes the CI log self-contained.
 python3 -I toolchain/check-so.py --floor 2.31 --version-script "$VERSION_SCRIPT" "$LIB"
+python3 -I tools/check_notice_holders.py --src src --closure "$BUILD/cmake-gen/closure.json" \
+  --module libandroid_runtime --archives "$BUILD/notices/libandroid_runtime/archives.tsv" \
+  --why-extract "$BUILD/notices/libandroid_runtime/why-extract.tsv" --notice "$BUILD/lib/NOTICE"
 endgroup
 
 group "dist"

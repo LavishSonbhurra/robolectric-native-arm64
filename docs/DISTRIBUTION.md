@@ -9,7 +9,7 @@ hosted and how versions are numbered.
 | Group | `io.github.lavishsonbhurra` |
 | Artifact | `robolectric-nativeruntime-linux-aarch64` |
 | First version | `4.17-16-robolectric-13921718-1` |
-| SDK 26 to 34 | `robolectric-nativeruntime-compat-linux-aarch64` and `-x86pixels`, from `1.0.19-1` (section 2a) |
+| SDK 26 to 34 | `robolectric-nativeruntime-compat-linux-aarch64` and `-x86pixels`, from `1.0.19-2` (section 2a) |
 | Hosting | GitHub releases first, Maven Central after that |
 
 ## 1. Goal
