@@ -17,6 +17,7 @@ transformSourceToObj:
 """
 
 import os
+import pathlib
 import re
 
 # ---- cc/config/global.go ---------------------------------------------------
@@ -360,6 +361,11 @@ def module_flags(gen, c):
     g_common += [f"-ffile-prefix-map={ROOT}=.",
                  f"-ffile-prefix-map={os.path.dirname(gen.gen_root_abs)}=out",
                  f"-ffile-prefix-map={SRC}/=", f"-ffile-prefix-map={gen.gen_root_abs}/=out/gen/"]
+    # A module with its own UBSan runtime gets the full check data, and clang does not apply the
+    # maps above to the file names in it. Cut the same prefix, so they stay relative as well.
+    if any("-fno-sanitize-link-runtime" in f for f in c.cflags):
+        depth = len(pathlib.PurePosixPath(SRC).parts)
+        g_common.append(f"-fsanitize-undefined-strip-path-components={depth}")
 
     g_c = ["-target", tc["triple"]]
     if not c.dir.startswith("external/"):
