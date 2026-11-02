@@ -19,8 +19,11 @@ import shutil
 import subprocess
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "src")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import target  # noqa: E402
+
+ROOT = target.ROOT
+SRC = target.SRC
 
 
 def sync_tree(src, dst):

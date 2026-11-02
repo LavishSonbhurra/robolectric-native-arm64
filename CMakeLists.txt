@@ -32,10 +32,11 @@ endif()
 project(robolectric_arm64 LANGUAGES C CXX ASM)
 
 # Which library to build (tools/target.py): sdk36 (libandroid_runtime.so for
-# SDK 36, the default) or compat (librobolectric-nativeruntime.so for
-# SDK <= 34, from android12-hostruntime-dev, inputs under config/compat/).
-set(RA64_TARGET "sdk36" CACHE STRING "Library to build: sdk36 or compat")
-set_property(CACHE RA64_TARGET PROPERTY STRINGS sdk36 compat)
+# SDK 36, the default), compat (librobolectric-nativeruntime.so for
+# SDK <= 34, from android12-hostruntime-dev, inputs under config/compat/) or
+# sdk37 (libandroid_runtime.so for SDK 37, inputs under config/sdk37/).
+set(RA64_TARGET "sdk36" CACHE STRING "Library to build: sdk36, compat or sdk37")
+set_property(CACHE RA64_TARGET PROPERTY STRINGS sdk36 compat sdk37)
 set(ENV{RA64_TARGET} "${RA64_TARGET}")
 if(RA64_TARGET STREQUAL "sdk36")
   set(_ra64_config "${CMAKE_SOURCE_DIR}/config")
@@ -48,8 +49,12 @@ elseif(RA64_TARGET STREQUAL "compat")
   set(_ra64_config "${CMAKE_SOURCE_DIR}/config/compat")
   set(_ra64_overrides "${_ra64_config}/overrides.toml")
   set(AOSP_SRC "${CMAKE_SOURCE_DIR}/src-compat")
+elseif(RA64_TARGET STREQUAL "sdk37")
+  set(_ra64_config "${CMAKE_SOURCE_DIR}/config/sdk37")
+  set(_ra64_overrides "${_ra64_config}/overrides.toml")
+  set(AOSP_SRC "${CMAKE_SOURCE_DIR}/src-sdk37")
 else()
-  message(FATAL_ERROR "RA64_TARGET must be sdk36 or compat, not ${RA64_TARGET}")
+  message(FATAL_ERROR "RA64_TARGET must be sdk36, compat or sdk37, not ${RA64_TARGET}")
 endif()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -93,7 +98,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
   ${_tool_sources})
 
 # The compat closure has no Rust and no aconfig: no cargo host tools.
-if(RA64_TARGET STREQUAL "sdk36")
+if(NOT RA64_TARGET STREQUAL "compat")
   include(cmake/host_tools.cmake)
 endif()
 include(cmake/link_runtime.cmake)
@@ -107,9 +112,18 @@ set(RA64_RUSTLIBS_ARCHIVE "" CACHE FILEPATH "Prebuilt librustlibs.a to link inst
 if(RA64_RUSTLIBS_ARCHIVE)
   add_library(rustlibs STATIC IMPORTED GLOBAL)
   set_target_properties(rustlibs PROPERTIES IMPORTED_LOCATION "${RA64_RUSTLIBS_ARCHIVE}")
-elseif(RA64_TARGET STREQUAL "sdk36" AND EXISTS "${CMAKE_SOURCE_DIR}/rust/rustlibs.cmake")
+elseif(NOT RA64_TARGET STREQUAL "compat" AND EXISTS "${CMAKE_SOURCE_DIR}/rust/rustlibs.cmake")
   set(RUSTLIBS_CXXBRIDGE "${CMAKE_BINARY_DIR}/rust/target/release/cxxbridge")
   set(RUSTLIBS_CXXBRIDGE_TARGET cxxbridge_tool)
+  if(RA64_TARGET STREQUAL "sdk37")
+    # rustc from [rust] of the target's aosp.toml, and the tools of the
+    # generated crates (rust_bindgen, rust_aconfig_library, AIDL Rust).
+    set(RUSTLIBS_VERSION 1.93.1)
+    set(RUSTLIBS_RUSTC "${CMAKE_SOURCE_DIR}/rust/toolchain-1.93.1/bin/rustc")
+    set(RUSTLIBS_GEN_ARGS --binary-dir "${CMAKE_BINARY_DIR}"
+        --bindgen "${AOSP_RUST_BINDGEN}" --aconfig "${AOSP_RUST_TARGET}/release/aconfig"
+        --aidl "${CMAKE_BINARY_DIR}/bin/aidl" "--bindgen-cflags=${RA64_CXX_FLAGS}")
+  endif()
   include(rust/rustlibs.cmake)
 endif()
 include("${AOSP_GEN_CMAKE}/generators.cmake")

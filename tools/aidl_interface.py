@@ -98,13 +98,19 @@ class Iface:
 
 def expand(gen):
     """Register synthetic modules for every aidl_interface in the index."""
-    from bp2cmake import Module
+    from bp2cmake import GenError, Module
     idx = gen.index
     ifaces = {}
     for name, m in list(idx.modules.items()):
         if m.type != "aidl_interface":
             continue
-        _, props = gen.res.resolve(name)
+        try:
+            _, props = gen.res.resolve(name)
+        except GenError as e:
+            # An interface in a partly fetched Android.bp. If something needs
+            # it, the closure reports the module as missing.
+            gen.cfg.warn(f"skipping aidl_interface {name}: {e}")
+            continue
         ifaces[name] = Iface(name, m.dir, props)
     gen.aidl_ifaces = ifaces
     for name, it in ifaces.items():

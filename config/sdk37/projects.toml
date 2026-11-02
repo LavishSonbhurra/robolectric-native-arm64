@@ -1,0 +1,337 @@
+# AOSP projects needed by the build, by checkout path (as in the manifest).
+#
+# `subdirs` limits the download to those directories (Gitiles serves one
+# tarball per directory); `files` adds single files outside them, typically a
+# top-level Android.bp that defines defaults or headers used elsewhere.
+# Without either, the whole project is downloaded. A project fetched in parts
+# always gets its top-level licence files too (NOTICE, LICENSE, METADATA, ...,
+# see tools/fetch.py); a licence module defined in an Android.bp that is not
+# fetched has to be listed here (tools/gen_notices.py reports it).
+#
+# tools/bp2cmake.py reports any module it cannot find; add the project (or
+# sub-directory) that defines it here and re-run tools/fetch.py.
+
+# ---- Build system inputs (Blueprint/Soong config, aconfig tooling) ----
+
+[[project]]
+path = "build/release"
+
+[[project]]
+path = "build/make"
+subdirs = ["tools/aconfig"]
+
+# licenses/: the Android-Apache-2.0 licence module (minikin, libziparchive,
+# server_configurable_flags, aconfig storage and liblogger use it).
+[[project]]
+path = "build/soong"
+subdirs = ["cc/config", "licenses"]
+# rust_baremetal_nostd_defaults (crates under external/rust/android-crates-io).
+files = ["Android.bp"]
+
+# ---- frameworks ----
+
+[[project]]
+path = "frameworks/base"
+subdirs = ["libs/hwui", "libs/androidfw", "libs/hostgraphics", "libs/nativehelper_jvm", "core/jni", "native/android",
+           "media/jni",
+           # aconfig declarations of cc_aconfig_library modules libinput uses
+           "core/java/android/window/flags", "core/java/android/companion/virtual/flags",
+           # android-os-binderstatsconsumer-aidl (libbinder)
+           "core/java/android/os/binder", "core/java/android/app/privatecompute",
+           # aconfig declarations of aconfig_text_flags_c_lib and aconfig_view_accessibility_flags_c_lib
+           "core/java/android/text/flags", "core/java/android/view/accessibility/flags"]
+files = ["Android.bp", "AconfigFlags.bp", "core/java/Android.bp", "core/java/android/content/res/flags.aconfig"]
+
+[[project]]
+path = "frameworks/native"
+subdirs = ["include", "headers", "opengl/include", "libs/ui", "libs/nativebase", "libs/nativedisplay",
+           "libs/nativewindow", "libs/arect", "libs/math", "libs/binder", "libs/gui", "libs/tracing_perfetto",
+           "services/surfaceflinger/common",
+           "libs/input", "libs/binderthreadstate", "libs/attestation", "libs/android_runtime_lazy", "aidl"]
+files = ["Android.bp", "services/surfaceflinger/surfaceflinger_flags.aconfig", "services/surfaceflinger/surfaceflinger_flags_new.aconfig", "services/surfaceflinger/Android.bp"]
+
+[[project]]
+path = "frameworks/minikin"
+
+[[project]]
+path = "frameworks/av"
+subdirs = ["include", "media/ndk/include"]
+
+# ---- system ----
+
+[[project]]
+path = "system/core"
+subdirs = ["include", "libcutils", "libutils", "libsystem", "libprocessgroup", "libvndksupport", "property_service",
+           "toolbox"]
+files = ["Android.bp"]
+
+[[project]]
+path = "system/libbase"
+
+[[project]]
+path = "system/logging"
+subdirs = ["liblog", "rust"]
+
+[[project]]
+path = "system/libziparchive"
+
+[[project]]
+path = "system/incremental_delivery"
+
+[[project]]
+path = "system/server_configurable_flags"
+
+[[project]]
+path = "system/media"
+subdirs = ["audio/include", "camera/include", "private/camera/include"]
+
+# libPlatformProperties (sysprop_library), InputProperties for MotionPredictor.
+[[project]]
+path = "system/libsysprop"
+subdirs = ["srcs"]
+
+[[project]]
+path = "system/libhwbinder"
+
+[[project]]
+path = "system/libhidl"
+
+[[project]]
+path = "system/libvintf"
+
+# libfmq-base headers, re-exported by libhidlbase.
+[[project]]
+path = "system/libfmq"
+subdirs = ["base"]
+files = ["Android.bp"]
+
+# latest_android_media_audio_common_types_cpp_target_shared defaults
+# (libandroid_runtime; Android-target only).
+[[project]]
+path = "system/hardware/interfaces"
+files = ["media/Android.bp"]
+
+# hidl-module-defaults (libhidlbase).
+[[project]]
+path = "system/tools/hidl"
+files = ["Android.bp"]
+
+[[project]]
+path = "system/tools/sysprop"
+
+[[project]]
+path = "system/tools/aidl"
+
+[[project]]
+path = "libnativehelper"
+
+# ---- hardware ----
+
+[[project]]
+path = "hardware/libhardware"
+subdirs = ["include", "include_all"]
+files = ["Android.bp"]
+
+[[project]]
+path = "hardware/interfaces"
+subdirs = ["graphics/common", "graphics/composer/aidl", "common/aidl", "drm/common/aidl"]
+# Android.bp: hardware_interfaces_license, the licence module of the AIDL
+# libraries above.
+files = ["Android.bp", "graphics/Android.bp"]
+
+# ---- external ----
+
+[[project]]
+path = "external/skia"
+subdirs = ["include", "src", "modules", "third_party", "client_utils", "linux", "tools"]
+files = ["Android.bp", "BUILD.gn", "LICENSE"]
+
+[[project]]
+path = "external/harfbuzz_ng"
+
+[[project]]
+path = "external/freetype"
+
+[[project]]
+path = "external/libpng"
+
+[[project]]
+path = "external/zlib"
+
+[[project]]
+path = "external/libjpeg-turbo"
+
+[[project]]
+path = "external/webp"
+
+[[project]]
+path = "external/expat"
+
+[[project]]
+path = "external/dng_sdk"
+
+[[project]]
+path = "external/piex"
+
+[[project]]
+path = "external/libultrahdr"
+
+[[project]]
+path = "external/wuffs-mirror-release-c"
+
+[[project]]
+path = "external/vulkan-headers"
+
+[[project]]
+path = "external/icu"
+subdirs = ["icu4c", "libandroidicu", "libandroidicuinit", "libicu", "android_icu4c", "build"]
+files = ["Android.bp"]
+
+[[project]]
+path = "external/rust/cxx"
+
+# Rust crates in the live Rust closure (rust/rustlibs.toml), plus the
+# lock file that pins every vendored crate version.
+[[project]]
+path = "external/rust/android-crates-io"
+subdirs = ["crates/env_logger", "crates/log", "crates/proc-macro2", "crates/quote",
+           "crates/syn", "crates/unicode-ident", "crates/skrifa", "crates/read-fonts", "crates/font-types",
+           "crates/bytemuck", "crates/bytemuck_derive", "crates/serde", "crates/serde_core", "crates/serde_derive",
+           "crates/serde_json", "crates/ryu", "crates/memchr", "crates/itoa", "crates/bitflags", "crates/anyhow",
+           "crates/thiserror", "crates/thiserror-impl", "crates/env_filter", "crates/clap", "crates/foldhash",
+           "crates/downcast-rs", "crates/libc", "crates/static_assertions", "crates/zerocopy", "crates/zerocopy-derive",
+           "crates/async-trait", "crates/lazy_static", "crates/cfg-if", "crates/regex", "crates/regex-automata",
+           "crates/regex-syntax", "crates/aho-corasick", "crates/humantime", "crates/termcolor", "crates/indexmap",
+           "crates/equivalent", "crates/hashbrown", "crates/rustversion"]
+files = ["pseudo_crate/Cargo.lock", "pseudo_crate/Cargo.toml"]
+
+# Finalized aconfig flags per SDK level; read by aconfig's build script.
+[[project]]
+path = "prebuilts/sdk"
+files = ["35/finalized-flags.txt", "36/finalized-flags.txt", "36.1/finalized-flags.txt", "37.0/finalized-flags.txt"]
+
+# Defaults used by modules in the closure (linker_hugepage_aligned,
+# bug_24465209_workaround; both only affect device builds), and the kernel
+# uapi headers libbinder, libhwbinder and libinput use on the host.
+[[project]]
+path = "bionic"
+subdirs = ["libc/kernel"]
+files = ["linker/Android.bp", "libc/Android.bp",
+         # AOSP's clang ships these as its builtin stdatomic.h (see
+         # overrides [toolchain]).
+         "libc/include/stdatomic.h", "libc/include/bits/stdatomic.h"]
+
+# apex-lowest-min-sdk-version defaults (min_sdk_version only).
+[[project]]
+path = "packages/modules/common"
+files = ["sdk/Android.bp"]
+
+# Android.bp: external_googletest_license (libgtest_prod_headers).
+[[project]]
+path = "external/googletest"
+subdirs = ["googletest"]
+files = ["Android.bp"]
+
+[[project]]
+path = "external/sqlite"
+
+[[project]]
+path = "external/fmtlib"
+
+[[project]]
+path = "external/image_io"
+
+[[project]]
+path = "external/modp_b64"
+
+# protobuf for host tools (sysprop_cpp) and aprotoc, as Soong builds them.
+[[project]]
+path = "external/protobuf"
+subdirs = ["src", "third_party/utf8_range", "upb", "upb_generator"]
+files = ["Android.bp"]
+
+[[project]]
+path = "external/abseil-cpp"
+
+# ---- New in the Android 17 closure ----
+
+# MotionPredictor JNI is registered on the host now, so libinput's TfLite
+# predictor and libtflite_static are linked.
+[[project]]
+path = "external/tensorflow"
+subdirs = ["tensorflow/lite", "tensorflow/core/public", "tensorflow/core/platform", "tensorflow/core/lib", "tensorflow/core/util", "tensorflow/tsl", "third_party/fft2d"]
+files = ["Android.bp", "tensorflow/core/kernels/eigen_spatial_convolutions-inl.h",
+         "tensorflow/core/kernels/eigen_convolution_helpers.h"]
+
+[[project]]
+path = "external/ruy"
+
+[[project]]
+path = "external/gemmlowp"
+
+[[project]]
+path = "external/eigen"
+
+[[project]]
+path = "external/flatbuffers"
+
+[[project]]
+path = "external/neon_2_sse"
+
+[[project]]
+path = "external/fft2d"
+
+[[project]]
+path = "external/tinyxml2"
+
+# JPEG XL in the DNG SDK.
+[[project]]
+path = "external/libjxl"
+
+[[project]]
+path = "external/google-highway"
+
+[[project]]
+path = "external/brotli"
+
+[[project]]
+path = "external/regex-re2"
+
+[[project]]
+path = "external/libtextclassifier"
+subdirs = ["native/utils/hash", "native/utils/base", "native/lang_id"]
+files = ["Android.bp", "native/Android.bp"]
+
+[[project]]
+path = "external/FP16"
+
+# cc_atomslog_library_static: libinput's stats log code comes from
+# stats-log-api-gen.
+[[project]]
+path = "frameworks/proto_logging"
+subdirs = ["stats"]
+
+# The fakes libinput links on the host.
+[[project]]
+path = "packages/modules/StatsD"
+subdirs = ["lib/libstatssocket", "lib/libstatspull"]
+
+# rust_static_cc_lib_defaults (libcxxbridge05; lto only).
+[[project]]
+path = "prebuilts/rust-toolchain/linux-x86"
+files = ["Android.bp"]
+
+# libdexfile_all_headers: dex/utf-inl.h for libnativehelper's utf.cpp on the host.
+[[project]]
+path = "art"
+subdirs = ["libdexfile/dex"]
+files = ["Android.bp", "libdexfile/Android.bp", "build/Android.bp"]
+
+# xmp_toolkit_sdk: libdng_sdk's whole_static_libs.
+[[project]]
+path = "external/XMP-Toolkit-SDK"
+
+[[project]]
+path = "external/perfetto"
+subdirs = ["include"]
+files = ["Android.bp"]

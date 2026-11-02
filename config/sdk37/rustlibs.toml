@@ -1,0 +1,42 @@
+# Input of tools/bp2rust.py for RA64_TARGET=sdk37: which Rust goes into
+# librustlibs.a. See docs/NOTES.md, "Rust", and docs/SDK37.md.
+
+[staticlib]
+# The cc_library_shared the staticlib is for. Soong passes
+# `-C metadata=<this module>` and checks `-Zallow-features` by its directory.
+for_module = "libandroid_runtime"
+for_module_dir = "frameworks/base/core/jni"
+
+# Rust modules linked by the C++ closure, as Soong sees them, minus
+# libaconfig_storage_read_api_cxx_bridge, which nothing live references (every
+# aconfig flag is read only in this release).
+roots = ["libminikin_rust_ffi", "libinput_rust_ffi", "libskia_rust_ffi", "libskrifa"]
+
+# external/rust/android-crates-io/pseudo_crate/Cargo.toml says bindgen-cli =
+# 0.72.1. cmake/host_tools.cmake builds it.
+[tools]
+bindgen_cli = "0.72.1"
+
+# external/rust/cxx/macro/Android.bp still says 1.0.119 while the crate is
+# 1.0.189. The macro puts the patch number in the bridge symbol names, so it has
+# to agree with cxxbridge, which cmake/host_tools.cmake builds with cargo as 189.
+[stale_pkg_version]
+modules = ["libcxxbridge_macro"]
+
+[prune.libminikin_rust_ffi]
+rustlibs = ["libflags_rust"]
+static_libs = ["libflags_rust_cpp_bridge"]
+reason = "flags_rust is only used in hyphenator.rs #[cfg(test)] code"
+
+[prune.libcxx]
+rustlibs = ["libanyhow", "libthiserror"]
+reason = "external/rust/cxx/src does not use anyhow or thiserror"
+
+[prune.liblogger]
+rustlibs = ["libenv_filter"]
+reason = "logger.rs uses env_filter only under #[cfg(target_os = \"android\")]"
+
+[prune.libinput_flags_rust]
+rustlibs = ["libaconfig_storage_read_api"]
+strip_lines = ["use aconfig_storage_read_api::"]
+reason = "every flag of this package is read only, so the generated crate only names the storage API in an unused `use` line"

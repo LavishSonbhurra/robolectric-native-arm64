@@ -1,0 +1,28 @@
+zeroMemory: do not need memset_explicit() from the C library on glibc
+
+Upstream: reverts platform/system/libhwbinder commit efd89fe
+  "Use our bionic and glibc memset_explicit() polyfill." (Elliott Hughes,
+  2025-06-06, Bug 416248344), for this build only.
+
+Why: that commit expects a memset_explicit() on glibc hosts. The polyfill is not
+in any project this build fetches, and glibc 2.31 from our Debian 11 sysroot has
+none, so the file does not compile. The code here is the form the commit
+removed, which is also what
+frameworks/native/libs/binder/Utils.h still does at this tag on non-bionic
+hosts: memset followed by a compiler barrier. The official library imports no
+memset_explicit either.
+
+--- a/Utils.h
++++ b/Utils.h
+@@ -22,7 +22,10 @@
+ namespace android::hardware {
+ 
+ inline void zeroMemory(uint8_t* data, size_t size) {
+-    memset_explicit(data, 0, size);
++    memset(data, 0, size);
++    // Assembly marking to prevent any optimizing compiler from not actually clearing the buffer,
++    // this matches what exactly what memset_explicit does.
++    __asm__ __volatile__("" : : "r"(data) : "memory");
+ }
+ 
+ }   // namespace android::hardware

@@ -9,6 +9,8 @@ RA64_TARGET (environment) picks the target:
           org.robolectric:nativeruntime-dist-compat): the same files under
           config/compat/ (aosp.toml, projects.toml, sources.lock.json,
           overrides.toml, patches/), sources in src-compat/.
+  sdk37   libandroid_runtime.so for SDK 37: the same files under config/sdk37/,
+          sources in src-sdk37/.
 
 The default keeps every path the SDK 36 build has always used.
 """
@@ -28,8 +30,13 @@ elif NAME == "compat":
     OVERRIDES = os.path.join(CONFIG, "overrides.toml")
     PATCHES = os.path.join(CONFIG, "patches")
     SRC = os.path.join(ROOT, "src-compat")
+elif NAME == "sdk37":
+    CONFIG = os.path.join(ROOT, "config", "sdk37")
+    OVERRIDES = os.path.join(CONFIG, "overrides.toml")
+    PATCHES = os.path.join(CONFIG, "patches")
+    SRC = os.path.join(ROOT, "src-sdk37")
 else:
-    raise SystemExit(f"RA64_TARGET={NAME}: unknown target (have sdk36, compat)")
+    raise SystemExit(f"RA64_TARGET={NAME}: unknown target (have sdk36, compat, sdk37)")
 
 AOSP_TOML = os.path.join(CONFIG, "aosp.toml")
 PROJECTS_TOML = os.path.join(CONFIG, "projects.toml")

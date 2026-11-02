@@ -107,9 +107,10 @@ def http_get(url, tries=6):
                 return r.read()
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
             last = e
-            if isinstance(e, urllib.error.HTTPError) and 400 <= e.code < 500:
+            if isinstance(e, urllib.error.HTTPError) and 400 <= e.code < 500 and e.code != 429:
                 raise SystemExit(f"GET {url}: HTTP {e.code} (missing path or revision?)")
-            time.sleep(10 * (i + 1))
+            # 429: Gitiles rate limit, which takes minutes to clear.
+            time.sleep((60 if getattr(e, "code", 0) == 429 else 10) * (i + 1))
     raise RuntimeError(f"GET {url} failed: {last}")
 
 

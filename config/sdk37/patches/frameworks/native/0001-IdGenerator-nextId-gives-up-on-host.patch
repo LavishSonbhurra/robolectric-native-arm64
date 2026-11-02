@@ -1,0 +1,32 @@
+IdGenerator::nextId: give up after 10 attempts on host
+
+Not a public commit. Reconstructed from the official library.
+
+Why: android-17.0.0_r1 retries /dev/urandom forever on host, which hangs a test
+JVM in a sandbox where the file cannot be read. The official SDK 37 library
+(CLR2.260407.039) stops after 10 attempts, logs the warning below at
+ANDROID_LOG_WARN with tag "Input", and returns the id from whatever is in the
+buffer: this is its nextId() as disassembled, and the string is in no public
+source of this tag. r1 is the newest public source, so the commit itself cannot
+be identified.
+
+--- a/libs/input/Input.cpp
++++ b/libs/input/Input.cpp
+@@ -170,11 +170,12 @@
+ #else
+ #if defined(__linux__)
+     // On host, <sys/random.h> / GRND_NONBLOCK is not available
+-    while (true) {
+-        status_t result = getRandomBytes(reinterpret_cast<uint8_t*>(&id), sizeof(id));
+-        if (result == OK) {
+-            break;
+-        }
++    status_t result = UNKNOWN_ERROR;
++    for (int attempt = 0; attempt < 10 && result != OK; attempt++) {
++        result = getRandomBytes(reinterpret_cast<uint8_t*>(&id), sizeof(id));
++    }
++    if (result != OK) {
++        ALOGW("Failed to generate random bytes for id");
+     }
+ #endif // __linux__
+ #endif // __ANDROID__

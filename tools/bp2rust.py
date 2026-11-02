@@ -31,6 +31,11 @@ Flag sources (build/soong at the pin):
 Usage:
   tools/bp2rust.py --out DIR --rustc PATH --cxxbridge PATH [--host-cc clang]
                    [--arch arm64|x86_64] [--explain MODULE]
+                   [--binary-dir DIR --bindgen PATH --aconfig PATH --aidl PATH]
+
+The second group is for closures with generated crates (rust_bindgen,
+rust_aconfig_library, the AIDL Rust backend), which Android 17 has and earlier
+releases do not. See tools/rust_gen.py.
 
 Proc macros, and the crates they depend on, are built for the build machine
 (they are loaded by rustc); everything else for --arch. In a native build
@@ -52,8 +57,14 @@ import bp2cmake  # noqa: E402  (Soong module index and variant resolver)
 ROOT = bp2cmake.ROOT
 SRC = bp2cmake.SRC
 
-RUST_DEFAULT_VERSION = "1.83.0"  # rust/config/global.go RustDefaultVersion
+# rust/config/global.go RustDefaultVersion. A target with another release
+# says so in [rust] of its aosp.toml.
+RUST_DEFAULT_VERSION = bp2cmake.load_toml(bp2cmake.target.AOSP_TOML).get("rust", {}).get("version", "1.83.0")
+SOONG_PROFILE = bp2cmake.load_toml(bp2cmake.target.AOSP_TOML).get("variant", {}).get("soong")
 DEFAULT_EDITION = "2021"         # rust/config/global.go DefaultEdition
+# Crates whose Android.bp cargo_pkg_version is out of date in the tree of
+# this target (set from rustlibs.toml): Cargo.toml wins.
+STALE_PKG_VERSION = set()
 # Soong's linux_glibc x86_64 triple is x86_64-unknown-linux-gnu.
 RUST_TRIPLES = {"arm64": "aarch64-unknown-linux-gnu", "x86_64": "x86_64-unknown-linux-gnu"}
 HOST_TRIPLE = {"aarch64": RUST_TRIPLES["arm64"], "x86_64": RUST_TRIPLES["x86_64"]}.get(platform.machine())
@@ -76,8 +87,17 @@ GLOBAL_RUST_FLAGS = [
     "--cfg soong",
 ]
 
+if SOONG_PROFILE == "android17":
+    # -C relocation-model=pic moved to LinuxHostGlobalRustFlags, after the
+    # global flags; -Z force-unstable-if-unmarked is new.
+    GLOBAL_RUST_FLAGS = [f for f in GLOBAL_RUST_FLAGS if f != "-C relocation-model=pic"]
+    GLOBAL_RUST_FLAGS.insert(GLOBAL_RUST_FLAGS.index("--cfg soong"), "-Z force-unstable-if-unmarked")
+    GLOBAL_RUST_FLAGS.append("-C relocation-model=pic")
+
 # rust/config/lints.go
 RUSTC_DEFAULT_LINTS = "-A deprecated -A unknown_lints -D missing-docs -D warnings -D unsafe_op_in_unsafe_fn"
+if SOONG_PROFILE == "android17":
+    RUSTC_DEFAULT_LINTS += " -A mismatched_lifetime_syntaxes"
 RUSTC_VENDOR_LINTS = "-A deprecated -D warnings"
 RUSTC_ALLOW_ALL = "--cap-lints allow"
 LINT_SETS = {"android": RUSTC_DEFAULT_LINTS, "vendor": RUSTC_VENDOR_LINTS, "none": RUSTC_ALLOW_ALL}
@@ -86,6 +106,8 @@ LINT_SET_FOR_PATH = [("external", "none"), ("hardware", "vendor"), ("prebuilts",
 
 RLIB_TYPES = {"rust_library", "rust_library_host", "rust_ffi_static", "rust_library_rlib",
               "rust_library_host_rlib", "rust_ffi_host_static"}
+# Crates generated at build time (rust/source_provider.go).
+SOURCE_PROVIDER_TYPES = {"rust_bindgen", "rust_aconfig_library", "aidl_rust"}
 PROC_MACRO_TYPES = {"rust_proc_macro"}
 HOST_ONLY = {"rust_library_host", "rust_library_host_rlib", "rust_ffi_host_static", "rust_proc_macro"}
 
@@ -124,10 +146,16 @@ class Crate:
         self.dir = mdir
         self.crate_name = props["crate_name"]
         self.proc_macro = mtype in PROC_MACRO_TYPES
-        root = props.get("crate_root") or (props.get("srcs") or [None])[0]
-        if not root:
-            raise Error(f"{name}: no crate_root or srcs")
-        self.root = os.path.normpath(os.path.join(mdir, root))
+        self.gen = None          # tools/rust_gen.py step for a generated crate
+        self.out_dir = "out"     # OUT_DIR: a generated source's directory if any
+        self.gen_srcs = []       # generators of `srcs: [":module"]` entries
+        if mtype in SOURCE_PROVIDER_TYPES:
+            self.root = None     # set by rust_gen
+        else:
+            root = props.get("crate_root") or (props.get("srcs") or [None])[0]
+            if not root:
+                raise Error(f"{name}: no crate_root or srcs")
+            self.root = os.path.normpath(os.path.join(mdir, root))
         self.edition = props.get("edition", DEFAULT_EDITION)
         self.features = props.get("features", [])
         self.cfgs = props.get("cfgs", [])
@@ -141,9 +169,13 @@ class Crate:
 
     # rust/builder.go rustEnvVars
     def env(self):
-        env = ["OUT_DIR=out", f"ANDROID_RUST_VERSION={RUST_DEFAULT_VERSION}"]
+        env = [f"OUT_DIR={self.out_dir}", f"ANDROID_RUST_VERSION={RUST_DEFAULT_VERSION}"]
+        if SOONG_PROFILE == "android17":
+            env.append("TARGET_BUILD_VARIANT=userdebug")
         if self.props.get("cargo_env_compat"):
             env += [f"CARGO_CRATE_NAME={self.crate_name}", f"CARGO_PKG_NAME={self.crate_name}"]
+            if SOONG_PROFILE == "android17":
+                env.append(f"CARGO_MANIFEST_DIR={self.dir}")
             v = self.version
             if v:
                 env.append(f"CARGO_PKG_VERSION={v}")
@@ -163,6 +195,8 @@ class Crate:
         if self.proc_macro:
             f.append("--extern proc_macro")
         f.append(f"-C metadata={self.module}")
+        if SOONG_PROFILE == "android17" and not self.proc_macro:
+            f.append("-C metadata=rlib-std")
         cfgs = [f"--cfg '{c}'" for c in self.cfgs]
         f += cfgs
         if not self.proc_macro:
@@ -179,17 +213,30 @@ class Crate:
 
 
 class Closure:
-    def __init__(self, conf, arch=None):
+    def __init__(self, conf, arch=None, gen_args=None):
         self.conf = conf
         self.cfg = bp2cmake.Config(arch)
         self.target_triple = RUST_TRIPLES[self.cfg.arch]
-        self.index = bp2cmake.Index(self.cfg)
-        self.res = bp2cmake.Resolver(self.cfg, self.index)
+        self.rust_gen = None
+        self.crate_class = Crate
+        self.rust_version = RUST_DEFAULT_VERSION
+        if gen_args and gen_args.bindgen:
+            # Generated crates need bp2cmake's cc model (exported include
+            # dirs of the modules bindgen reads) and its AIDL interfaces.
+            import rust_gen
+            self.rust_gen = rust_gen.RustGen(self, gen_args)
+            self.index = self.rust_gen.gen.index
+            self.res = self.rust_gen.gen.res
+        else:
+            self.index = bp2cmake.Index(self.cfg)
+            self.res = bp2cmake.Resolver(self.cfg, self.index)
         self.crates = {}
         self.order = []
         self.prune = conf.get("prune", {})
 
     def resolve(self, name):
+        if self.rust_gen and self.rust_gen.is_aidl_rust(name):
+            return self.rust_gen.aidl_module(name)
         m = self.index.get(name)
         if m is None:
             raise Error(f"module {name} not found (is its project in config/projects.toml?)")
@@ -202,16 +249,20 @@ class Closure:
         if name in stack:
             raise Error(f"dependency cycle: {' -> '.join(stack + (name,))}")
         m, mtype, props = self.resolve(name)
-        if mtype not in RLIB_TYPES | PROC_MACRO_TYPES:
+        if mtype not in RLIB_TYPES | PROC_MACRO_TYPES | SOURCE_PROVIDER_TYPES:
             raise Error(f"{name} ({m.where()}): unsupported module type {mtype}")
+        if mtype in SOURCE_PROVIDER_TYPES and not self.rust_gen:
+            raise Error(f"{name} ({m.where()}): generated crate, but no bindgen, aconfig and aidl tools given")
         if mtype not in HOST_ONLY and not props.get("host_supported"):
             raise Error(f"{name} ({m.where()}): not host_supported")
         if props.get("enabled") is False:
             raise Error(f"{name} ({m.where()}): disabled on host")
         c = Crate(name, mtype, props, m.dir)
         c.bp = m.where()
+        if self.rust_gen:
+            self.rust_gen.setup(c)
         pr = self.prune.get(name, {})
-        c.pruned = {k: v for k, v in pr.items() if k != "reason"}
+        c.pruned = {k: v for k, v in pr.items() if k not in ("reason", "strip_lines")}
         for k, v in c.pruned.items():
             missing = [d for d in v if d not in props.get(k, [])]
             if missing:
@@ -292,6 +343,8 @@ class Closure:
             for g in props.get("generated_headers", []) + props.get("generated_sources", []):
                 gm, gtype, gprops = self.resolve(g)
                 if gtype != "genrule" or "cxxbridge" not in gprops.get("tools", []):
+                    if self.rust_gen:
+                        continue
                     raise Error(f"{d}: generated {g} is not a cxxbridge genrule")
                 if g not in [x[0] for x in out]:
                     out.append((g, gm, gprops))
@@ -309,6 +362,9 @@ def check_versions(crates):
         locked.setdefault(p["name"], set()).add(p["version"])
     report = []
     for c in crates:
+        if c.gen:
+            report.append((c, "-", "generated"))
+            continue
         tomlp = os.path.join(SRC, c.dir, "Cargo.toml")
         if not c.version:
             if os.path.exists(tomlp):
@@ -322,6 +378,8 @@ def check_versions(crates):
         if os.path.exists(tomlp):
             with open(tomlp, "rb") as f:
                 pkg = tomllib.load(f).get("package", {})
+            if c.module in STALE_PKG_VERSION:
+                c.version = pkg.get("version")
             if pkg.get("version") != c.version:
                 raise Error(f"{c.module}: Android.bp says {c.version}, {tomlp} says {pkg.get('version')}")
         name = (pkg or {}).get("name") or os.path.basename(c.dir)
@@ -352,22 +410,34 @@ def ninja_escape(s):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--config", default=os.path.join(ROOT, "rust", "rustlibs.toml"))
+    ap.add_argument("--config", default=None)
     ap.add_argument("--rustc", required=True)
     ap.add_argument("--cxxbridge", required=True)
     ap.add_argument("--host-cc", default="clang", help="linker driver for proc macros (host .so)")
     ap.add_argument("--arch", choices=sorted(RUST_TRIPLES), help="default: config/aosp.toml [variant] arch")
     ap.add_argument("--explain", action="append", default=[])
+    ap.add_argument("--binary-dir", help="CMake binary dir, for generated crates")
+    ap.add_argument("--bindgen", help="bindgen binary, for generated crates")
+    ap.add_argument("--aconfig", help="aconfig binary, for generated crates")
+    ap.add_argument("--aidl", help="aidl binary, for generated crates")
+    ap.add_argument("--bindgen-cflags", help="toolchain flags for bindgen's libclang")
+    ap.add_argument("--libclang-dir", default="/usr/lib/llvm-21/lib", help="LIBCLANG_PATH for bindgen")
     args = ap.parse_args()
 
+    # The target's own rustlibs.toml if it has one.
+    if args.config is None:
+        args.config = os.path.join(bp2cmake.target.CONFIG, "rustlibs.toml")
+        if not os.path.exists(args.config):
+            args.config = os.path.join(ROOT, "rust", "rustlibs.toml")
     with open(args.config, "rb") as f:
         conf = tomllib.load(f)
+    STALE_PKG_VERSION.update(conf.get("stale_pkg_version", {}).get("modules", []))
     out = os.path.abspath(args.out)
     rustc = os.path.abspath(args.rustc)
     cxxbridge = os.path.abspath(args.cxxbridge)
 
     try:
-        cl = Closure(conf, args.arch)
+        cl = Closure(conf, args.arch, args)
         cl.build()
         genrules = cl.cxxbridge_genrules()
         versions = check_versions(cl.order)
@@ -413,24 +483,31 @@ def main():
         "",
     ]
     proc_link = [f"-C linker={args.host_cc}", "-C link-arg=-fuse-ld=lld"]
+    if cl.rust_gen:
+        lines += cl.rust_gen.ninja_rules()
 
     def crate_build(c):
         libflags = []
         implicit = []
+        for g in c.gen_srcs:
+            implicit += g.outputs
         for d in c.rustlibs + c.proc_macros:
             libflags.append(f"--extern {d.crate_name}={d.out}")
             implicit.append(d.out)
         libflags.append("-L dependency=$odir/crates")
         flags = c.rustc_flags() + (proc_link if c.proc_macro else [])
         o = c.out
+        root = c.root if c.gen else ninja_escape(c.root)
         return [
-            f"build {o}: rustc {ninja_escape(c.root)} | {' '.join(implicit)} $rustc",
+            f"build {o}: rustc {root} | {' '.join(implicit)} $rustc",
                         f"  env = {' '.join(shlex.quote(e) for e in c.env())}",
             f"  libflags = {' '.join(libflags)}",
             f"  flags = {' '.join(flags).replace('$', '$$')}",
             "",
         ]
 
+    if cl.rust_gen:
+        lines += cl.rust_gen.ninja_steps()
     for c in cl.order:
         lines += crate_build(c)
         if c.module in args.explain:
@@ -504,6 +581,8 @@ def main():
         f.write(f"set(RUSTLIBS_CC_DEPS {' '.join(cl.cc_deps)})\n")
         f.write(f"set(RUSTLIBS_CRATES {' '.join(c.module for c in cl.order)})\n")
         f.write(f"set(RUSTLIBS_CONFIGURE_DEPENDS {cm(bps + [os.path.abspath(args.config)])})\n")
+        if cl.rust_gen:
+            f.write(f"set(RUSTLIBS_BUILD_DEPS {' '.join(cl.rust_gen.cmake_deps())})\n")
 
     with open(os.path.join(out, "crates.tsv"), "w") as f:
         f.write("module\tcrate\tversion\tedition\tkind\tin_staticlib\tdir\tfeatures\tcfgs\tversion_check\n")
