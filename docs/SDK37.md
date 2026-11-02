@@ -25,9 +25,13 @@ A clean build without ccache took 8,604 s of ninja time (2 h 23 min), `-j2` on t
 with memhold stopped. That includes cargo builds of aconfig, cxxbridge and bindgen. It ran in three
 slices under the shared build lock, because two steps failed on the way and were fixed; nothing was
 recompiled between slices. The result is byte-identical to the incremental ccache build that the
-tests below ran on (SHA-256 `b406e55ddea0c95e...`, unstripped). Stripped with `llvm-strip --strip-all`,
-as `ci/build.sh` does, it is 23,999,616 bytes, SHA-256
-`fa0b0791f116be7090d6cffe022eb07a4148c34c34803de90210b4734739a0c1`.
+tests below ran on (SHA-256 `b406e55ddea0c95e...`, unstripped).
+
+After those tests, a comparison with CI showed 76 absolute build paths in that library, in the UBSan check
+data of the DNG SDK, which builds its own runtime. Those file names are now relative. Only strings and
+offsets changed, and CI ran the rig again on the result. Stripped with `llvm-strip --strip-all`, as
+`ci/build.sh` does, the library is 23,995,744 bytes, SHA-256
+`29ed591b70bff7327a8d882cbb01f78218a9652394f7a138316e91d4873e5a08`.
 
 The closure has 289 modules, 168 of them compiled, 3,559 C and C++ sources and 6 host tools (SDK
 36: 115, 81, 2,350 and 4). The Rust part is 44 crates, 31 of them in `librustlibs.a`.

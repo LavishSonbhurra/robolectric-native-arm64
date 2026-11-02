@@ -9,9 +9,9 @@ a local build on an Ampere Altra VM (Ubuntu 26.04 host, checkout under the home 
 `366cf8c87a5de93f75b4a470f30695e4a8d16655`. The `reproduce` job in `.github/workflows/build.yml` keeps
 testing this and fails on any byte of difference.
 
-The `reproduce` job runs for SDK 35 and 37 too, but it has not run yet. For those two the only evidence
-so far is one machine and one path: a clean build gave the same bytes as the incremental one. Treat them
-as "not yet known to be reproducible across paths and machines".
+For SDK 35 and 37, the library built on the 2-core Ampere Altra VM and the one built in the CI `build` job
+are byte-identical, at different checkout paths. The `reproduce` job runs for them too, but it has not run
+yet.
 
 ## What the comparison covers
 
@@ -40,6 +40,7 @@ separately (exit status 3) to make it easy to recognise.
 | Absolute source paths in `__FILE__`, assert and log strings | Handled. Every compile gets `-ffile-prefix-map=<src>/=` and `-ffile-prefix-map=<gen root>/=out/gen/` (`tools/soong_flags.py`). A `strings` scan of an unstripped build found no home-directory or build-directory path. |
 | Checkout and build directory in debug info (`DW_AT_comp_dir`, `.debug_line`, sysroot headers) | Handled. Soong's `-fdebug-prefix-map=/proc/self/cwd=` does nothing here because we compile from the build directory, so every compile also gets `-ffile-prefix-map=<checkout>=.` and `-ffile-prefix-map=<build dir>=out`, before the two maps above (clang applies the last matching map). The only absolute paths left in the debug info are the same on every machine: `/usr/lib/clang/21`, `/rustc/<commit>`, `/rust/deps`, `/cargo/registry` (from the Rust toolchain) and `/x-tools` (from the Debian GCC runtime objects). |
 | Rust paths | Handled by design: rustc runs with the source tree as working directory and `-Z remap-cwd-prefix=.`; std comes from the verified tarball (`/rustc/<commit>/library/...` strings). |
+| Absolute paths in UBSan check data | Handled. Clang does not apply the prefix maps to it. It only matters for a module with its own UBSan runtime (the DNG SDK at SDK 37), which gets `-fsanitize-undefined-strip-path-components`. |
 | LLVM runtime paths | `build-runtimes.sh` maps the LLVM source directory to `out/llvm-project/`, its build directory to `out/runtimes` and the rest of `toolchain/` (the sysroot) to `toolchain`. |
 | Time | `__DATE__`/`__TIME__` are errors (`-Werror=date-time`, in Soong's global flags). `llvm-ar` writes uid 0 and date 1970 (checked: `adler32.c.o` in `libz.a`). No timestamps in the link. `SOURCE_DATE_EPOCH` is exported for any tool that honours it. |
 | Archive and link order | Member order follows the generated CMake source lists; link order is Soong's dependency order. Both come from Python code that sorts its inputs (24 `sorted()` calls; the only unsorted `glob` calls are in `release_config.py` for flag declarations, to be audited). `PYTHONHASHSEED=0` is set so that no set or dict order depends on the process. |
