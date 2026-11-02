@@ -560,8 +560,7 @@
    "crates/indexmap",
    "crates/equivalent",
    "crates/hashbrown",
-   "crates/rustversion",
-   "crates/foldhash"
+   "crates/rustversion"
   ],
   "files": [
    "pseudo_crate/Cargo.lock",
