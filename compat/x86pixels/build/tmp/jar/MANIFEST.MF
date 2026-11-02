@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Implementation-Title: robolectric-nativeruntime-compat-linux-aarch64-x86
+ pixels
+Implementation-Version: 1.0.19-2
+Nativeruntime-Dist-Compat-Version: 1.0.19
+Ra64-Pixels: x86
+

@@ -97,7 +97,9 @@ fetch_verified() {
     echo "$2  $f" | sha256sum -c -
     if [ -z "$GNUPGHOME" ]; then
         curl -fsSL -o "$DL/rust-key.gpg.ascii" "$BASE/../rust-key.gpg.ascii"
-        GNUPGHOME=$(mktemp -d "$TC/gnupg.XXXXXX")
+        # Not under $TC: gpg-agent's socket path has a limit of 108 characters, which the
+        # longer rust/toolchain-V/ directories go over in CI.
+        GNUPGHOME=$(mktemp -d)
         export GNUPGHOME
         gpg --batch --quiet --import "$DL/rust-key.gpg.ascii"
         gpg --batch --list-keys --with-colons | grep -q "^fpr:::::::::$KEY_FPR:" \
