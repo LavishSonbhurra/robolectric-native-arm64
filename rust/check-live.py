@@ -48,6 +48,8 @@ def crate_of(path):
         return "std dep " + p.split("/")[3]
     if p.startswith("external/rust/android-crates-io/crates/"):
         return p.split("/")[4]
+    if p.startswith("external/rust/crates/"):  # android-15 layout
+        return p.split("/")[3]
     if p.startswith("external/rust/cxx/"):
         return "cxx"
     if p.startswith("frameworks/minikin/rust/"):

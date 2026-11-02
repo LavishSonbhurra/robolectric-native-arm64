@@ -1,0 +1,6 @@
+os.name=Linux
+os.arch=amd64
+java.version=17.0.20.1
+java.vendor=Eclipse Adoptium
+robolectric.arm64.loadedFrom=null
+sdk=35

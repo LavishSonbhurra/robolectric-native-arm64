@@ -1,0 +1,79 @@
+Create hostgraphics header target
+
+Upstream: platform/frameworks/base commit 688b3704864
+
+Why: build prerequisite of the following hwui commits.
+
+diff --git a/libs/hostgraphics/Android.bp b/libs/hostgraphics/Android.bp
+index 09232b64616..a58493aa47c 100644
+--- a/libs/hostgraphics/Android.bp
++++ b/libs/hostgraphics/Android.bp
+@@ -7,6 +7,17 @@ package {
+     default_applicable_licenses: ["frameworks_base_license"],
+ }
+ 
++cc_library_headers {
++    name: "libhostgraphics_headers",
++    host_supported: true,
++    export_include_dirs: ["include"],
++    target: {
++        windows: {
++            enabled: true,
++        },
++    },
++}
++
+ cc_library_host_static {
+     name: "libhostgraphics",
+ 
+@@ -30,12 +41,13 @@ cc_library_host_static {
+     ],
+ 
+     header_libs: [
++        "libhostgraphics_headers",
+         "libnativebase_headers",
+         "libnativedisplay_headers",
+         "libnativewindow_headers",
+     ],
+ 
+-    export_include_dirs: ["."],
++    export_include_dirs: ["include"],
+ 
+     target: {
+         windows: {
+diff --git a/libs/hostgraphics/gui/BufferItem.h b/libs/hostgraphics/include/gui/BufferItem.h
+similarity index 100%
+rename from libs/hostgraphics/gui/BufferItem.h
+rename to libs/hostgraphics/include/gui/BufferItem.h
+diff --git a/libs/hostgraphics/gui/BufferItemConsumer.h b/libs/hostgraphics/include/gui/BufferItemConsumer.h
+similarity index 100%
+rename from libs/hostgraphics/gui/BufferItemConsumer.h
+rename to libs/hostgraphics/include/gui/BufferItemConsumer.h
+diff --git a/libs/hostgraphics/gui/BufferQueue.h b/libs/hostgraphics/include/gui/BufferQueue.h
+similarity index 100%
+rename from libs/hostgraphics/gui/BufferQueue.h
+rename to libs/hostgraphics/include/gui/BufferQueue.h
+diff --git a/libs/hostgraphics/gui/ConsumerBase.h b/libs/hostgraphics/include/gui/ConsumerBase.h
+similarity index 100%
+rename from libs/hostgraphics/gui/ConsumerBase.h
+rename to libs/hostgraphics/include/gui/ConsumerBase.h
+diff --git a/libs/hostgraphics/gui/IGraphicBufferConsumer.h b/libs/hostgraphics/include/gui/IGraphicBufferConsumer.h
+similarity index 100%
+rename from libs/hostgraphics/gui/IGraphicBufferConsumer.h
+rename to libs/hostgraphics/include/gui/IGraphicBufferConsumer.h
+diff --git a/libs/hostgraphics/gui/IGraphicBufferProducer.h b/libs/hostgraphics/include/gui/IGraphicBufferProducer.h
+similarity index 100%
+rename from libs/hostgraphics/gui/IGraphicBufferProducer.h
+rename to libs/hostgraphics/include/gui/IGraphicBufferProducer.h
+diff --git a/libs/hostgraphics/gui/Surface.h b/libs/hostgraphics/include/gui/Surface.h
+similarity index 100%
+rename from libs/hostgraphics/gui/Surface.h
+rename to libs/hostgraphics/include/gui/Surface.h
+diff --git a/libs/hostgraphics/ui/Fence.h b/libs/hostgraphics/include/ui/Fence.h
+similarity index 100%
+rename from libs/hostgraphics/ui/Fence.h
+rename to libs/hostgraphics/include/ui/Fence.h
+diff --git a/libs/hostgraphics/ui/GraphicBuffer.h b/libs/hostgraphics/include/ui/GraphicBuffer.h
+similarity index 100%
+rename from libs/hostgraphics/ui/GraphicBuffer.h
+rename to libs/hostgraphics/include/ui/GraphicBuffer.h

@@ -1,0 +1,949 @@
+{
+ "_tag": "android-15.0.0_r1",
+ "bionic": {
+  "name": "platform/bionic",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "361ba86734fb2821a6adcfdf775db8abd04e0de0",
+  "subdirs": [
+   "libc/kernel"
+  ],
+  "files": [
+   "linker/Android.bp",
+   "libc/Android.bp",
+   "libc/include/stdatomic.h",
+   "libc/include/bits/stdatomic.h"
+  ],
+  "tree_sha256": "06c6349d95342594c86d49078cafff045554e2c371f83f3aa16047cf3c476b4d",
+  "tarball_sha256": {
+   "libc/kernel": "8f18b42c63e393eb6ada962bfaae655551e10f4bde6df14a645476d775e6bdd6"
+  },
+  "license_files": [
+   [
+    "METADATA",
+    "f"
+   ]
+  ]
+ },
+ "build/make": {
+  "name": "platform/build",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "3d9c9aacdb6ca0b745b3048dad88d0db4680d50e",
+  "subdirs": [
+   "tools/aconfig"
+  ],
+  "files": [],
+  "tree_sha256": "47fb07486a60ae5aa54ce8edd3ecd056a7d368919a4eb775f23e99c0a5109a04",
+  "tarball_sha256": {
+   "tools/aconfig": "a815fd992a2403ce2f5587650e6d9f0c9dcce0bf240fd5411422a4067d2e3169"
+  },
+  "license_files": []
+ },
+ "build/release": {
+  "name": "platform/build/release",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "e1dfb3dc783166aadcf150d67d3d53d68001883a",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "f027d288ade173da67c3088e341ece3b519031a3f5bded186b0256932b52be01",
+  "tarball_sha256": {
+   ".": "701f11ac643ca44172eaf11c8062931e9d18f179141296b797bb22dbd0065526"
+  }
+ },
+ "build/soong": {
+  "name": "platform/build/soong",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "3fe78dc9b32f1ac3f7eb279ae9376d7037b18452",
+  "subdirs": [
+   "cc/config",
+   "licenses"
+  ],
+  "files": [],
+  "tree_sha256": "97d2e5fa09bfe11adfea962dc946e57bf93026cb4e641fd38488f19c1b113aeb",
+  "tarball_sha256": {
+   "cc/config": "46528a356dcba0d8bfe69176614d49e474ee9df6fa96c227a80507ec2459922f",
+   "licenses": "9733a67cf0b6942b05df833b378797d5d9751f2b2e6f8e9c3c9fb138b981302f"
+  },
+  "license_files": [
+   [
+    "METADATA",
+    "f"
+   ]
+  ]
+ },
+ "external/dng_sdk": {
+  "name": "platform/external/dng_sdk",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "9a357a01c38c8ceb42c8947171ee35a017eb1c05",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "750d2414411c7178bfd3e7908b2917e8cbeae736fd72981d6d04f19b609ee21e",
+  "tarball_sha256": {
+   ".": "4b7c58d18b43cb37520bcd04e7fbeb12639a0e6984474956630a69967ef2dcfb"
+  }
+ },
+ "external/expat": {
+  "name": "platform/external/expat",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "8ae3fff00472acf17b96871c7cdeaccfa7430c73",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "847c1b999fb9bb38d5139b212c859df25b51f76aa25c824ee7e8f0138c8dc005",
+  "tarball_sha256": {
+   ".": "ef47b63feb3efb64129d79aafa8eb848c057d5884c2f9dd41205f3a9eba9ea63"
+  }
+ },
+ "external/fmtlib": {
+  "name": "platform/external/fmtlib",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "360e74bb8ec766ee05e5c4e8956c811391e3e9e5",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "dc94b54b33236b57d19bd079f982afc37616f4a988a67d1cbc9bc1c47b530b2b",
+  "tarball_sha256": {
+   ".": "049ebb526b584fbd464a6347e4457359221984b0de326c960f46e4232dea3dee"
+  }
+ },
+ "external/freetype": {
+  "name": "platform/external/freetype",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "5ab8c8be9c2ce2c42aaa79752bffc89618d39515",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "23d94e88865f9e91e53c177f46cb4ff0a8eee7796afe3f0b4f23fb533e99a340",
+  "tarball_sha256": {
+   ".": "d1202103a1daec674d5480e13cdc69f1542dded7f34a63257b1661437ff8c78d"
+  }
+ },
+ "external/googletest": {
+  "name": "platform/external/googletest",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "c05eedac6f5e4a88876bfd963ca846fe3ebf595d",
+  "subdirs": [
+   "googletest"
+  ],
+  "files": [
+   "Android.bp"
+  ],
+  "tree_sha256": "4766cb5847e910b49327ba7c3ff508083781aabd26443076bfb6da178f4f5ce1",
+  "tarball_sha256": {
+   "googletest": "ed7730f8bf5554f47b00d20a8aada015fc6a30db5b45720f689610c5d38e7337"
+  },
+  "license_files": [
+   [
+    "LICENSE",
+    "f"
+   ],
+   [
+    "METADATA",
+    "f"
+   ]
+  ]
+ },
+ "external/harfbuzz_ng": {
+  "name": "platform/external/harfbuzz_ng",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "9a50c421c9ca31c44462ce31785f03ff41631ba5",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "c84b2eabe844e11cfccab7537b17f7caec9fb8106d4c485da49d2d8f7f7ec327",
+  "tarball_sha256": {
+   ".": "a7739b2cbda56f05bc969088cca458945a07ef509f2a7365987461f46c75d366"
+  }
+ },
+ "external/icu": {
+  "name": "platform/external/icu",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "cf305aeb6df416fa81cfc98bd73d913ee781175d",
+  "subdirs": [
+   "icu4c",
+   "libandroidicu",
+   "libandroidicuinit",
+   "libicu",
+   "android_icu4c",
+   "build"
+  ],
+  "files": [
+   "Android.bp"
+  ],
+  "tree_sha256": "cf13ec8a8699d0ee8f336961b8ee2a35d1e66b95aa2b8b68a26901aa2dd0c2bf",
+  "tarball_sha256": {
+   "icu4c": "89b3fd9522835ee226efa8de77a8839396bd42a3a764533dfa671d08d8462f1b",
+   "libandroidicu": "40dfe4059eff5cadbd5d5a0369c0caaa4a80ec6aea6fdb44b41ed448e27b5411",
+   "libandroidicuinit": "c3d12ee0108130ba4523d1ba5f4919582af98285fc0e84662a1b3e47912ffa2e",
+   "libicu": "9336914229dfd8aa3cb71189eb90a164e7826ffe1d386f296899003e786c4cc0",
+   "android_icu4c": "434caa26cc01fe17e04f46111fc40c9bd492c0f7f98e91881e1b9638807d2743",
+   "build": "a6668c856fcca49eebee7627a426b6021f1e9e4777247dfb74040449b1699984"
+  },
+  "license_files": [
+   [
+    "LICENSE",
+    "f"
+   ],
+   [
+    "METADATA",
+    "f"
+   ],
+   [
+    "MODULE_LICENSE_BSD_LIKE",
+    "f"
+   ]
+  ]
+ },
+ "external/image_io": {
+  "name": "platform/external/image_io",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "37e2347000d74a82140eeba79fd6ba1232e3f607",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "83d4d3036a543f0f3a4f5ecdd5028a85611781da2c2019eac9c99168a75d42c1",
+  "tarball_sha256": {
+   ".": "888e1d0db0b59174a70916a585ecdf0bf642d6fd4d641305e638c206c383530a"
+  }
+ },
+ "external/libjpeg-turbo": {
+  "name": "platform/external/libjpeg-turbo",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "1e113e5593faff149088b2e3b750b2e554afffb6",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "d601bdd777f8a95cede7a59ed8fef982ed062d4d9248a452e8f8ca5e66fed45c",
+  "tarball_sha256": {
+   ".": "b99c2493f694831a065dbe2abd679f0ecdd4a436d0df30f717897443c53e6ced"
+  }
+ },
+ "external/libpng": {
+  "name": "platform/external/libpng",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "6a336e4372cfb5f4a128a6c454d43de359a7ef95",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "786612db4f3ef994126bf841eac763e75a9f4f740d1d967b6870a7a3238f9649",
+  "tarball_sha256": {
+   ".": "176ff76d765d5247d01e8c1acfa354c7d7ec048c451536a2ff97c6489ab975aa"
+  }
+ },
+ "external/libultrahdr": {
+  "name": "platform/external/libultrahdr",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "448f96ed83151f92fdaf840075f385b4c56315a7",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "0f0e817635910f1fa3e4c55d7eb37a27b1ce6fba126b0071c273ee8a05741d10",
+  "tarball_sha256": {
+   ".": "3dd0d2d1e71ba0e0edcbbce5282c20ffb22b14475ec2e9fa44aad168d22aa538"
+  }
+ },
+ "external/modp_b64": {
+  "name": "platform/external/modp_b64",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "d88d4daed951785fafb3f5b761558364ebe6ac61",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "d0d9eefa989c25c7e2877834a01af6d1166a345f53498fe1dea40db26cf0210e",
+  "tarball_sha256": {
+   ".": "5ab9e30d627580eb3a226e7c22b3c7fcc9b09cccc3e49bdfe2083e6b56e6d420"
+  }
+ },
+ "external/piex": {
+  "name": "platform/external/piex",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "5fb5c5bc89c3a619cb000add45b82518ab1c3f7a",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "c8013d3533d662a8640c05e8b7bd313b9b2b45585f41477a7e14c9be578e64f1",
+  "tarball_sha256": {
+   ".": "af5a0bc6df04cc768d1f0f0d9ca9b3dfe61ba7b91cb66b8014a728491af6031e"
+  }
+ },
+ "external/protobuf": {
+  "name": "platform/external/protobuf",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "aeea14007d1a5841e2499322e232beb6c7717814",
+  "subdirs": [
+   "src",
+   "android"
+  ],
+  "files": [
+   "Android.bp"
+  ],
+  "tree_sha256": "d1ffeaa4bad27b73fcea9b65d151c06c82f0290c076e4a60e6cc9a35c35fcb79",
+  "tarball_sha256": {
+   "src": "b0079522a66daa434fb5f26665b9e114cb6ff9e138e267fe8f78d5f859951c49",
+   "android": "0cb9791e77d19942d3f44e08dceb1d6231df7fc0335d924fb1d2a69c55bd568e"
+  },
+  "license_files": [
+   [
+    "LICENSE",
+    "f"
+   ],
+   [
+    "METADATA",
+    "f"
+   ],
+   [
+    "MODULE_LICENSE_BSD",
+    "f"
+   ]
+  ]
+ },
+ "external/rust/crates/cfg-if": {
+  "name": "platform/external/rust/crates/cfg-if",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "d1e8636290eff5f974e803cac4573adf7413ead3",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "56fdd294ea2ac03e6e626a60f0ab98b3e4d1415e09cff45930182999146f9341",
+  "tarball_sha256": {
+   ".": "fbb1e315ec5e87b3975e9e34650fc0040a8be854eb74490aec1eb9d4170cd22e"
+  }
+ },
+ "external/rust/crates/env_logger": {
+  "name": "platform/external/rust/crates/env_logger",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "a7c32c5e9b34fcc2b49d6c4eed39aaf8f191d494",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "2db7de32a21c459b82b9f8debfc835be38f63ab79b903dbf3dd72702ef008b11",
+  "tarball_sha256": {
+   ".": "0f6c053337117577360c1bf9fdd4f99622f9edf41e254a145ce9c8a78a130323"
+  }
+ },
+ "external/rust/crates/log": {
+  "name": "platform/external/rust/crates/log",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "fcb30d62882e9b5a41ee333cdfa63086ccd2f4f2",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "72c15e5d4197331c7f4d13266f2b3279b9a0777b80838be55b0cd79e5c7c6910",
+  "tarball_sha256": {
+   ".": "17cbcd2b900318358036df43c6348cb1a2f265119f3daa3db09e3b889ff9a9b4"
+  }
+ },
+ "external/rust/crates/proc-macro2": {
+  "name": "platform/external/rust/crates/proc-macro2",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "8d62230140536a037130c2095e973e2b018c87fa",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "3b6106e67bd56e43953433a08eaac938ac70de0814b702d122d06a01450c8556",
+  "tarball_sha256": {
+   ".": "a5ac906e22e5056e17ea4d34d1cc6c26c614f9e968a385d931665360af5d70af"
+  }
+ },
+ "external/rust/crates/quote": {
+  "name": "platform/external/rust/crates/quote",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "3eb8c2ca3716d486d603370ef35012d1d0c9e740",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "647500f3085383395367081c1f7cb3ab6ed463ba0d66d1824d567e56abba2f12",
+  "tarball_sha256": {
+   ".": "53e1ec90b651123c6ade2ffa2a2e4358c1d4e5be5c06fd19a5b7b4a93b7a437a"
+  }
+ },
+ "external/rust/crates/syn": {
+  "name": "platform/external/rust/crates/syn",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "8eb29f0ca2816fffb5f50fb28bba6427c3c95842",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "c0f5f474501928c99c3e5ff57579c0a8fdfae205e44905ba6714ad43c0c8409a",
+  "tarball_sha256": {
+   ".": "b051c45dfc9634c0b1bd4053fef4a30471347eac44f4be07cdd39c919ac06817"
+  }
+ },
+ "external/rust/crates/unicode-ident": {
+  "name": "platform/external/rust/crates/unicode-ident",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "f2fd5f721b61d913e53563a7cbbfe1544634d368",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "48ce87c17752a78bdedf8c38910a2f7617106df046d018837b813a2092a5de9e",
+  "tarball_sha256": {
+   ".": "cfe0a8d2a305fe8847f3b9bfa904a894355d310adc60c1d6afcfce93cc36f623"
+  }
+ },
+ "external/rust/cxx": {
+  "name": "platform/external/rust/cxx",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "1869e93e54fa9d9425bd88bdb25073af9ed7e782",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "4cc840f022876e35cbbf1b3f0345cd69d5e3fadc8aaf99b90b5dd963f6b54791",
+  "tarball_sha256": {
+   ".": "dde713c3fe32d91a4492e35eca3e692756a0842928fd2a5123d8d998631de553"
+  }
+ },
+ "external/skia": {
+  "name": "platform/external/skia",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "0fe593a9a878f410a1d6a09a434b29a26d3eb853",
+  "subdirs": [
+   "include",
+   "src",
+   "modules",
+   "third_party",
+   "client_utils",
+   "linux",
+   "tools"
+  ],
+  "files": [
+   "Android.bp",
+   "BUILD.gn",
+   "LICENSE"
+  ],
+  "tree_sha256": "4f345e20ce9d65989b699061aea023ce65fdf2f9ec5118ca3dfa0876276979b1",
+  "tarball_sha256": {
+   "include": "b69cb421e8b5cf45a9414912b688e1a9729b2f543736de71fc8551429692905e",
+   "src": "84f59081c105a2f9b614b6b668226683cdbe1da7816300dbe5bca82d1d948055",
+   "modules": "40b347973bcda0db785ba0e80adc4f0f17e582a13e9a1b564c1ddb779a040aa2",
+   "third_party": "9a6d80e7ed0eeb7e9c78de3131c0250f5ceaf7df28f5496c0d9d9d8b3c98092e",
+   "client_utils": "9385772664fab2117696e7eb02847d5a34e1136eb2c1e529431a8d7857a56146",
+   "linux": "452a87afeac26477e1bcb52a34ee94236910b000704a28eb0dec255ba8a65020",
+   "tools": "4219ffa0da5b45210670d042a013d7e78b861f5f69d87e5b2767c66cba902ef7"
+  },
+  "license_files": [
+   [
+    "METADATA",
+    "f"
+   ],
+   [
+    "MODULE_LICENSE_BSD",
+    "f"
+   ],
+   [
+    "NOTICE",
+    "f"
+   ]
+  ]
+ },
+ "external/sqlite": {
+  "name": "platform/external/sqlite",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "af6bb6a379e12d41b80a3468a4c8cab9263cc721",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "5cf9e82df20a73653e630c3957dc9fc85365b998987e1b9cd469c23c5db0290a",
+  "tarball_sha256": {
+   ".": "bd72e3d8674c068e84a1b580d10ac8a33372dd5e64c7633036f07921873ea1b9"
+  }
+ },
+ "external/vulkan-headers": {
+  "name": "platform/external/vulkan-headers",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "d3602c8e1b0b8268c336768e1a8cf1be17dcc087",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "e44a8fe39684111f44d096b0a0743756847bccdf731fb30b2d7fc05e35805b7e",
+  "tarball_sha256": {
+   ".": "473c82161186e4ae8e291ca7e67b3c95fd626ddba705ffd442e6d4a43d290001"
+  }
+ },
+ "external/webp": {
+  "name": "platform/external/webp",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "c3a8e58734bdaa63a2287d387e5a10526c4ac833",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "3ea9af6d9435e08a244f59c08748dd544d8d52f8665a8622e2eefabc9ba80dc6",
+  "tarball_sha256": {
+   ".": "ab7e1abfeb86a94db1e45bd62162b48b75862cd3ab15921466480b07cb189119"
+  }
+ },
+ "external/wuffs-mirror-release-c": {
+  "name": "platform/external/wuffs-mirror-release-c",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "479408ccc13b0a230ece03a909fa56a197df2fe9",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "09f382e0d7c49231c91b6f08259a974798a1b31287ab0cb92fa131378f892117",
+  "tarball_sha256": {
+   ".": "1ebb136dcb1a170fd35a69744078c70e4d611eb546433f37f1f5a7c699755bc4"
+  }
+ },
+ "external/zlib": {
+  "name": "platform/external/zlib",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "86056a43326ceb4d9f5c3ca2410e51dcdcb4517d",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "4af6e50fabca8962b6545e368a4c664ea3f3828b33801c5f4caee09c1f56bff8",
+  "tarball_sha256": {
+   ".": "595a7e09f4ab93ac7e4a1895a4360293fda87b3ae4feb9313768787725817595"
+  }
+ },
+ "frameworks/av": {
+  "name": "platform/frameworks/av",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "1863cb0ea5a9e1340f11a435618ff863e017da29",
+  "subdirs": [
+   "include",
+   "media/ndk/include"
+  ],
+  "files": [],
+  "tree_sha256": "7b67537bdd5b1de5cce0683b8e57cc0005f1a48c0387b2972d9fe7fc2b065f11",
+  "tarball_sha256": {
+   "include": "d4cc7a7040ad99880dc6e863e88c624d2845be72ed30da9ba65f9d088326b78a",
+   "media/ndk/include": "7b7a98f2f66bb9aecf137e91d28cf038776afea4d6cb2828124e97b02b210dc7"
+  },
+  "license_files": [
+   [
+    "METADATA",
+    "f"
+   ],
+   [
+    "MODULE_LICENSE_APACHE2",
+    "f"
+   ],
+   [
+    "NOTICE",
+    "f"
+   ]
+  ]
+ },
+ "frameworks/base": {
+  "name": "platform/frameworks/base",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "4e43ad12e1b211f15152e9c5b16b0fe88e6b93f3",
+  "subdirs": [
+   "libs/hwui",
+   "libs/androidfw",
+   "libs/hostgraphics",
+   "core/jni",
+   "native/android",
+   "media/jni",
+   "core/java/android/window/flags",
+   "core/java/android/companion/virtual/flags"
+  ],
+  "files": [
+   "Android.bp",
+   "AconfigFlags.bp"
+  ],
+  "tree_sha256": "6306c956d61d00368139ae80674ef3d6ffdfa95077c58822488e789b157e1a02",
+  "tarball_sha256": {
+   "libs/hwui": "3810178507026167830d4e0db2a688ceaf921c49b6000520405becf7bbaf3fa7",
+   "libs/androidfw": "f3b1b7e1fe332bd0a3c0cd6e37ab7512d7694fa73538d18efae7214e210ebfab",
+   "libs/hostgraphics": "ede26c85f50cc0e3314d62191d3173bf2bc2a85f66cddcfb4819e496262f717a",
+   "core/jni": "9858fd53c086ad787d070a6099d4be2030245584908426f501e560376a93596d",
+   "native/android": "6f854818a6af88807357587bce78c058065992e182b982c69a39fe66257f11cb",
+   "media/jni": "e91278c14da8a98bd3bd5919887d4fcd5566b9100910b6284d55ab1d33b73856",
+   "core/java/android/window/flags": "c9dc9c4433fab93f0f0a5634339c8f6d8dc120950a51064a4e9a4c15a24041f5",
+   "core/java/android/companion/virtual/flags": "cb5ea8aceba565dfd8cad684567a2e740a505cecd018f2a4b3431043579bd1e2"
+  },
+  "license_files": [
+   [
+    "METADATA",
+    "f"
+   ],
+   [
+    "MODULE_LICENSE_APACHE2",
+    "f"
+   ],
+   [
+    "NOTICE",
+    "f"
+   ]
+  ]
+ },
+ "frameworks/minikin": {
+  "name": "platform/frameworks/minikin",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "b41e852cee7ffcc52ab476aa52db5644812ec114",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "64853affba5b899ed3e0888917614e85f995a154cec7070a2d695636880d83a5",
+  "tarball_sha256": {
+   ".": "1f753e657a4e81fa0f8fdb8f53065bdf3b486d390cb8fe04238e90abb70672dc"
+  }
+ },
+ "frameworks/native": {
+  "name": "platform/frameworks/native",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "f7274fca5e36082674740bc6c976f73c4578d009",
+  "subdirs": [
+   "include",
+   "headers",
+   "opengl/include",
+   "libs/ui",
+   "libs/nativebase",
+   "libs/nativedisplay",
+   "libs/nativewindow",
+   "libs/arect",
+   "libs/math",
+   "libs/binder",
+   "libs/gui",
+   "libs/input",
+   "libs/binderthreadstate",
+   "libs/attestation",
+   "libs/android_runtime_lazy",
+   "aidl",
+   "libs/tracing_perfetto"
+  ],
+  "files": [
+   "Android.bp"
+  ],
+  "tree_sha256": "c7889fd905e7554d21e1d4c5b6a614384823d46f740571f59030f0438faef7c8",
+  "tarball_sha256": {
+   "include": "d15005b24da3bc00cdfe2b9ee680530ebdbca4ca89fa45d316c4f7bc17012ca4",
+   "headers": "39fa9a3fc2adcd824a421cd7024395a22b10af60d009ccb5b5f960be749fde6c",
+   "opengl/include": "cf0538957230ad7ec1f4a8825df82571c0e3c8ad20238e7392466996fc145c73",
+   "libs/ui": "3da4fade664a762049774aeffd2d1659d1684b300e1f1e7d1ea6e62a1a56771c",
+   "libs/nativebase": "48d8d7f4451e8ef5d1be1dd8aeea613c254068530c31fa501b7379e6b052c594",
+   "libs/nativedisplay": "ccffa2db5825403ff5015eba0183dee8255ecff9c23096263e603ed87b87cbbf",
+   "libs/nativewindow": "77657467848608ba8c837f1bd723c7b8d4de66b9bb040899d3287163417c2905",
+   "libs/arect": "cfda22647e695b82380f1b64c8f02be4bb1393439039cc15e0e574956d47aac6",
+   "libs/math": "d127f854ea121418df13bbf6e6f9644eb80cbd17de78f67896e87ce6f532a415",
+   "libs/binder": "d63bfb42766e2acb605f118aa8d984c134755c9c9ace6119bc4bd21126cdb387",
+   "libs/gui": "434a70ce4fcea7d4ad2a108eed1191320b69f8fd4850f7128a4d400c96e2749e",
+   "libs/input": "eb9ac2a9053b7f254098eeafa1a463293b4a7d46d7e34e34d2d3f75ded2592b6",
+   "libs/binderthreadstate": "042839111839d76f8826df8aff9baa9681a2f22f24f84252997c5b68098c6009",
+   "libs/attestation": "e8d53bf88d5d5e1f1679c492fd72845471bed8470be43e7fc1d5b5591264af35",
+   "libs/android_runtime_lazy": "87f57e281bf737fd8ad3ab1a4914f308304d5b1d23d20e63d41324a6cddb51e5",
+   "aidl": "a3226fec66a2d40fb25ff64aac615d5a9d866a3b3fff527d47adb5ac95eeef05",
+   "libs/tracing_perfetto": "317f434664a83f839e8733f3bb9cad5b4c007d27e67b1dabf5715dc692a72e41"
+  },
+  "license_files": [
+   [
+    "METADATA",
+    "f"
+   ],
+   [
+    "MODULE_LICENSE_APACHE2",
+    "f"
+   ],
+   [
+    "NOTICE",
+    "f"
+   ]
+  ]
+ },
+ "hardware/interfaces": {
+  "name": "platform/hardware/interfaces",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "488942f82bd1bc9ad1cb65a02c71421dc3a6a3d6",
+  "subdirs": [
+   "graphics/common",
+   "graphics/composer/aidl",
+   "common/aidl"
+  ],
+  "files": [
+   "Android.bp",
+   "graphics/Android.bp"
+  ],
+  "tree_sha256": "254aa4f77328adc06a51abe533ec38a4bffc452e6123a5b647b6ba52de38f812",
+  "tarball_sha256": {
+   "graphics/common": "56dab0d06ac96882f36ce97130b1f107e2826a446c3e03d2310e5e4add152637",
+   "graphics/composer/aidl": "f920c67e07ae5e52c6ef97ba84510766677360b97d4755181684ab1686bc6803",
+   "common/aidl": "9b4c3557e7af8304c893e63976c22ac9af3c21e1eb1867fa8e6596c5b7352ff6"
+  },
+  "license_files": [
+   [
+    "METADATA",
+    "f"
+   ],
+   [
+    "NOTICE",
+    "f"
+   ]
+  ]
+ },
+ "hardware/libhardware": {
+  "name": "platform/hardware/libhardware",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "58faa60aadb6e17fc0af9b0e5246a09ec046ec96",
+  "subdirs": [
+   "include",
+   "include_all"
+  ],
+  "files": [
+   "Android.bp"
+  ],
+  "tree_sha256": "fa0ed5d85b3680a4cd9ba940d0adc0e9772a7b7624e262d8c6a5a289a77e0d58",
+  "tarball_sha256": {
+   "include": "d8d57d25271405bdf6cbac0c229c09c47fa1d770422d29b094f40a4e3cf62692",
+   "include_all": "cc5b1e77237b610e9a52a1fbb936357853fa7e4376dc3f71c804a9676b4634f0"
+  },
+  "license_files": [
+   [
+    "METADATA",
+    "f"
+   ],
+   [
+    "MODULE_LICENSE_APACHE2",
+    "f"
+   ],
+   [
+    "NOTICE",
+    "f"
+   ]
+  ]
+ },
+ "libnativehelper": {
+  "name": "platform/libnativehelper",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "3ca43dfe2bf4613852df0303531fa8ecf4b7063c",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "0168d9cdd834a16a37412f19401616c7128e60b48cbaddd89fd0ca7b5c3eb5e5",
+  "tarball_sha256": {
+   ".": "226d232168220a102a6c8d5db182d697cf9e2134a195e1984dfc293198eee64e"
+  }
+ },
+ "packages/modules/common": {
+  "name": "platform/packages/modules/common",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "cd899d322ead9fc2ec176200fa404a7f1917b9a1",
+  "subdirs": [],
+  "files": [
+   "sdk/Android.bp",
+   "sdk/ModuleDefaults.bp"
+  ],
+  "tree_sha256": "681b42f7897a3efc59a4ac2946763464ded23501447a4ca7487fd7e82c66c512",
+  "tarball_sha256": {},
+  "license_files": []
+ },
+ "prebuilts/rust": {
+  "name": "platform/prebuilts/rust",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "2e94432e6f8c326db2ea7a319de2c033c3c4e3b5",
+  "subdirs": [],
+  "files": [
+   "Android.bp"
+  ],
+  "tree_sha256": "3666eb62def6e9d0759c9f0bbe302ca23824bc55b05209d3684074392aea3db1",
+  "tarball_sha256": {},
+  "license_files": [
+   [
+    "METADATA",
+    "f"
+   ]
+  ]
+ },
+ "system/core": {
+  "name": "platform/system/core",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "fc7bc8c4bfb4c6095e34ea784509dae56f25b486",
+  "subdirs": [
+   "include",
+   "libcutils",
+   "libutils",
+   "libsystem",
+   "libprocessgroup",
+   "libvndksupport",
+   "property_service",
+   "toolbox",
+   "libvendorsupport"
+  ],
+  "files": [],
+  "tree_sha256": "543511598337f9c89212211c86fc5414780e9b7c7c3a7450217ab7f685d27df5",
+  "tarball_sha256": {
+   "include": "a6005fa19a393a7d3c9098af20c347a75b675bee99644bb7545218fbd3299b34",
+   "libcutils": "ec4928fadc0d6eaad783b39aa696b51ec5ba8c98d29a565b417562061f2cfe78",
+   "libutils": "ed68c0ce2337d18017a3b6ac6bc754b64f5e319679713c726cfa047f81fa271b",
+   "libsystem": "66c8781b8cf5d3b04c873cb99e7ccd5cfaaf6220e6c2838cc1ecadd4ac7e9989",
+   "libprocessgroup": "ef8855f7684046fe1d799e11538562cbb7eb6fc5b5328d7e433f44629ddf8e03",
+   "libvndksupport": "5360af3fd343f7e744d3bcbdd9bb7576c9d1816dff6ab075f764374594eeb1ea",
+   "property_service": "7ef0c71ff218d1401605a10ed2c76ec8004dc155225156f3584321bbfb884726",
+   "toolbox": "80ab7f7c3567280e095c7d1940b47eb1f5b64b1975747fcdb79b21383675b3da",
+   "libvendorsupport": "7a416f5e3260e51b5a3a0d091e7a1756d1e738e7738ec2a49ba6158d511e02c0"
+  },
+  "license_files": [
+   [
+    "METADATA",
+    "f"
+   ],
+   [
+    "MODULE_LICENSE_APACHE2",
+    "f"
+   ]
+  ]
+ },
+ "system/hardware/interfaces": {
+  "name": "platform/system/hardware/interfaces",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "34d76c29fff78058183215ab8d57fa8ea7944db0",
+  "subdirs": [],
+  "files": [
+   "media/Android.bp"
+  ],
+  "tree_sha256": "98cbc9e44eb8f5f3193649f259bbd4f7f774b7300d0f3cd190e964b8fc5d7bd3",
+  "tarball_sha256": {},
+  "license_files": [
+   [
+    "NOTICE",
+    "f"
+   ]
+  ]
+ },
+ "system/incremental_delivery": {
+  "name": "platform/system/incremental_delivery",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "fcd1a7622ab49905e2bd3e3fd46bd2b15ca75389",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "27589d6559aa3470b179f038f6f262e413fc179fbaa715ab3a5bd70af04e1143",
+  "tarball_sha256": {
+   ".": "41c9844f51f1e36c342a02343ebabb38753c2c38b7321636c8e15e7784fb1ab3"
+  }
+ },
+ "system/libbase": {
+  "name": "platform/system/libbase",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "68f963c62f7fddc70c34df141d943ae0f7631020",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "b43c9fff8da51898d7ddc4768d2ac8ab8ae3dd07d103b624c5a60c2d64dc54a3",
+  "tarball_sha256": {
+   ".": "b88540e6dbda2c947d16d0ee8b58838b8d6450a3bb78b38f692442f70e7ea481"
+  }
+ },
+ "system/libfmq": {
+  "name": "platform/system/libfmq",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "e913a84568c39e832af34035fe93f813cc5133c7",
+  "subdirs": [
+   "base"
+  ],
+  "files": [
+   "Android.bp"
+  ],
+  "tree_sha256": "be6d57cdd0fab790415bd7fa3b22517d8e7b7df34adff94d7f909d7c36a8fd4b",
+  "tarball_sha256": {
+   "base": "2bb3c0a26d6eeb6228d210972ef13593953f26b7fcc2be61093a6965137aaf8a"
+  },
+  "license_files": []
+ },
+ "system/libhidl": {
+  "name": "platform/system/libhidl",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "dffcee6b429e5b56cf40fcbca6502826adabd747",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "6aebeea149d42d2d2b93f9646813e68ae06fd08dd6c6e34c2fc667cba59ad4b8",
+  "tarball_sha256": {
+   ".": "60554bf1e65d6e337fd7f6d1ef27818ca4d4c2c6611219318940041cb10ff5ca"
+  }
+ },
+ "system/libhwbinder": {
+  "name": "platform/system/libhwbinder",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "142745e883f896decfaedd7f8d310da96123eb1c",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "69010592496f2562cf5c8ab5b44aa25dfe4d723680a7987d1ba0ba7f21be8179",
+  "tarball_sha256": {
+   ".": "8f1801bd007a35dc5a251b43bc5852f0bd6e969aacc1e96c1d3222e172d69176"
+  }
+ },
+ "system/libvintf": {
+  "name": "platform/system/libvintf",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "0748000fca71d7ecea7184883fed4c23997f91b6",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "91e889c1823a0d8fa7deddcfd5a6c61d2116bf2dbdc18850927a3ee9d2d09eaa",
+  "tarball_sha256": {
+   ".": "b686a04d975f6f3a9f552e7b689ee6e4cb7a984d7a82a5ace7c37c2107341742"
+  }
+ },
+ "system/libziparchive": {
+  "name": "platform/system/libziparchive",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "13b815f485784ed356869746796bb405ec86a7d4",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "d7da8fdbef8cb0c0f8963457ff28bf87194bc36676ec54855b6afe37a11c39be",
+  "tarball_sha256": {
+   ".": "34879a53220bbd687919215775673c8af66763661ad087a383e6df0f44e7e172"
+  }
+ },
+ "system/logging": {
+  "name": "platform/system/logging",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "54d3fa266d2123c0b076c646fae60d049311052a",
+  "subdirs": [
+   "liblog",
+   "rust"
+  ],
+  "files": [],
+  "tree_sha256": "de15ca1a07dcd3d1d3b7971f0b0b65c15c538ed1b60dd99be1929acbd2205035",
+  "tarball_sha256": {
+   "liblog": "d579c80a495e89cf797c13e3d214e7b7644ead2422e4b8157ac1daa665c74ca0",
+   "rust": "e020af204a206bf00ed4e7c688bab7ac97eb76a0f0c107bb2cae99f32c1e178a"
+  },
+  "license_files": []
+ },
+ "system/media": {
+  "name": "platform/system/media",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "0287f16fc74c607c04a9570ee3ae914e1285cd2c",
+  "subdirs": [
+   "audio/include",
+   "camera/include",
+   "private/camera/include"
+  ],
+  "files": [],
+  "tree_sha256": "caa1c1d1939af7baff6660094252c387ced20a2840dec771c0024afba652ed3d",
+  "tarball_sha256": {
+   "audio/include": "1428280ce420c3c6bd8bf2733d2a49024e8716f7b9190645171edc492ae7cf95",
+   "camera/include": "93a6b40c4f703c7cf8a0e544577c8a912d5f41244330d1fc9d1ad3725ee4386e",
+   "private/camera/include": "94dbb73b516c9907673a3ab7a2b65bb6fa7e76845d6b43e5028d71e3a8baa73d"
+  },
+  "license_files": [
+   [
+    "NOTICE",
+    "f"
+   ]
+  ]
+ },
+ "system/server_configurable_flags": {
+  "name": "platform/system/server_configurable_flags",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "3b6d3e8d7d20d2f1876c8882dcbdf347b16f80dc",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "68e142f809f2699b2b738f169087a1b7d4067f1a56eb7ebf8a835ccf084af0eb",
+  "tarball_sha256": {
+   ".": "f4eba5cc2a153a8a33e459d4e6c514e5089d6b9b03c6a44edd38f5d45b7b15bc"
+  }
+ },
+ "system/tools/aidl": {
+  "name": "platform/system/tools/aidl",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "d1304733b74b69f26dbe2d3c40c797aaac22f163",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "3d4fe025ff2a672a7a7633e8a1aeaa284b5a1a158994c58e64a326dc03df0051",
+  "tarball_sha256": {
+   ".": "949b8282648e08287f4db5f83589d0e18e9e70b3467dadff85b3ef1c951ccb2e"
+  }
+ },
+ "system/tools/hidl": {
+  "name": "platform/system/tools/hidl",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "a61c3e7eafd1c3ac523c105392a88c0165237394",
+  "subdirs": [],
+  "files": [
+   "Android.bp"
+  ],
+  "tree_sha256": "39af59f2250bcd2403865a3ec4e947acf4a829ecd2f3f4a15f5fdb4ca065acda",
+  "tarball_sha256": {},
+  "license_files": [
+   [
+    "NOTICE",
+    "f"
+   ]
+  ]
+ },
+ "system/tools/sysprop": {
+  "name": "platform/system/tools/sysprop",
+  "rev": "refs/tags/android-15.0.0_r1",
+  "commit": "5be999d96af8fb091376a8ef85d3b9015d9f8be9",
+  "subdirs": [],
+  "files": [],
+  "tree_sha256": "f2dc0dd536b0d3da31b3dfa95e9b5d0ca92ad72ea145cca6cd90edc40ee196e3",
+  "tarball_sha256": {
+   ".": "78df6e0783faecc33468b6f0575ce5b4e737cb46d1110ad40be7c1c0e8e8cb16"
+  }
+ }
+}

@@ -179,22 +179,24 @@ if os.environ.get("RA64_LIBCXX_INCLUDE"):
     STL_CPPFLAGS = ["-nostdinc++", "-isystem", os.environ["RA64_LIBCXX_INCLUDE"]]
 
 
-PROFILES = ("android16", "android12")
+PROFILES = ("android16", "android15", "android12")
 
 
 def use_profile(name):
     """Switch the global flag tables to another Soong version: "android16"
-    (the tables above) or "android12" (tools/soong_flags_s.py)."""
+    (the tables above), "android15" (tools/soong_flags_v.py) or "android12"
+    (tools/soong_flags_s.py)."""
     if name in (None, "", "android16"):
         return
-    if name != "android12":
+    if name not in PROFILES:
         raise ValueError(f"unknown Soong flag profile {name} (have {', '.join(PROFILES)})")
-    import soong_flags_s
+    import importlib
+    mod = importlib.import_module({"android15": "soong_flags_v", "android12": "soong_flags_s"}[name])
     g = globals()
-    for k, v in vars(soong_flags_s).items():
+    for k, v in vars(mod).items():
         if k.isupper():
             if k not in g:
-                raise ValueError(f"soong_flags_s.{k} does not replace anything in soong_flags")
+                raise ValueError(f"{mod.__name__}.{k} does not replace anything in soong_flags")
             g[k] = v
 
 

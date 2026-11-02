@@ -1,0 +1,20 @@
+Remove superfluous #include.
+
+Upstream: platform/frameworks/native commit 4878c0d5a, Dan Albert, 2024-10-29.
+Only the context differs from upstream.
+
+Why: android/api-level.h does not exist on host. r1 relied on a symlink in
+Soong's host include path that this build does not have. The header needs
+nothing from it: libhwui passes -D__INTRODUCED_IN(n)= on host. Build fix with
+no effect on generated code.
+
+--- a/include/android/performance_hint.h
++++ b/include/android/performance_hint.h
+@@ -52,7 +52,6 @@
+  *   - DO NOT CHANGE THE LAYOUT OR SIZE OF STRUCTURES
+  */
+ 
+-#include <android/api-level.h>
+ #include <stdint.h>
+ #include <unistd.h>
+ 

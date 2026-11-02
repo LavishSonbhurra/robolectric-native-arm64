@@ -1,0 +1,23 @@
+Do not define JNI_OnLoad for Windows
+
+Upstream: platform/frameworks/base commit a19127a199d
+
+Why: no effect on Linux. Applied so the later HostRuntime commits apply unchanged.
+
+diff --git a/core/jni/platform/host/HostRuntime.cpp b/core/jni/platform/host/HostRuntime.cpp
+index 020b27e82be..19f82998c1a 100644
+--- a/core/jni/platform/host/HostRuntime.cpp
++++ b/core/jni/platform/host/HostRuntime.cpp
+@@ -391,6 +391,7 @@ public:
+ 
+ } // namespace android
+ 
++#ifndef _WIN32
+ using namespace android;
+ 
+ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void*) {
+@@ -407,3 +408,4 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void*) {
+ 
+     return JNI_VERSION_1_6;
+ }
++#endif

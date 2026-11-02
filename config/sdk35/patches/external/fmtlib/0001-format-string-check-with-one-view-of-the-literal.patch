@@ -1,0 +1,23 @@
+fmtlib: compile-time format check uses one view of the literal
+
+Not an upstream commit; fmt 11 reworked this code. Build fix for clang 21.
+
+basic_format_string converts its argument to a string_view twice, once for
+str_ and once for the checker. With FMT_STRING that evaluates the string
+literal twice, and clang 21 treats the two results as pointers to different
+objects (CWG 2765), so the subtraction in advance_to() is not a constant
+expression. Handing str_ to both removes the second evaluation.
+
+The check runs only at compile time, so generated code does not change.
+
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -2784,7 +2784,7 @@
+                   detail::count_statically_named_args<Args...>()) {
+       using checker =
+           detail::format_string_checker<Char, remove_cvref_t<Args>...>;
+-      detail::parse_format_string<true>(str_, checker(s));
++      detail::parse_format_string<true>(str_, checker(str_));
+     }
+ #else
+     detail::check_format_string<Args...>(s);

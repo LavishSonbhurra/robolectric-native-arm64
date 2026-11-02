@@ -1,0 +1,28 @@
+# Input of tools/bp2rust.py: which Rust goes into librustlibs.a, for
+# RA64_TARGET=sdk35. Same roots as rust/rustlibs.toml; at android-15.0.0_r1
+# minikin has no flags_rust dependency and logger no env_filter.
+#
+# Soong links Rust into a C++ shared library by compiling every rlib in the
+# library's closure into one staticlib (cc/builder.go GenerateRustStaticlib).
+# We build the same staticlib for libandroid_runtime, but only from the crates
+# that are live in the official library (see docs/NOTES.md, "Rust"). Everything
+# else (crates, flags, features, cfgs, editions, versions) comes from the
+# Android.bp files at the pin.
+
+[staticlib]
+# The cc_library_shared the staticlib is for. Soong passes
+# `-C metadata=<this module>` and checks `-Zallow-features` by its directory.
+for_module = "libandroid_runtime"
+for_module_dir = "frameworks/base/core/jni"
+
+# Rust modules linked by the C++ closure, as Soong sees them: libminikin's
+# `target.linux.whole_static_libs`. Their rustlibs and proc_macros are
+# followed transitively.
+roots = ["libminikin_rust_ffi"]
+
+# Dependencies listed in Android.bp that the host build of the live crates
+# never uses. They are not built, so rustc itself proves the claim: a crate
+# that is referenced but not passed with --extern fails to compile.
+[prune.libcxx]
+rustlibs = ["libanyhow", "libthiserror"]
+reason = "external/rust/cxx/src does not use anyhow or thiserror"

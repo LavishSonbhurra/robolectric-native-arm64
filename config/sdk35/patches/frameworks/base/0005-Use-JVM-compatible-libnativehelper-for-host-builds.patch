@@ -1,0 +1,34 @@
+Use JVM-compatible libnativehelper for host builds
+
+Upstream: platform/frameworks/base commit 79f29ea8cf7
+
+Why: switches the host build to the library from the first patch.
+
+diff --git a/core/jni/Android.bp b/core/jni/Android.bp
+index 61eaa526116..3434358659b 100644
+--- a/core/jni/Android.bp
++++ b/core/jni/Android.bp
+@@ -116,7 +116,6 @@ cc_library_shared_for_libandroid_runtime {
+     ],
+ 
+     static_libs: [
+-        "libnativehelper_lazy",
+         "libziparchive_for_incfs",
+         "libguiflags",
+     ],
+@@ -289,6 +288,7 @@ cc_library_shared_for_libandroid_runtime {
+                 "libgif",
+                 "libgui_window_info_static",
+                 "libkernelconfigs",
++                "libnativehelper_lazy",
+                 "libseccomp_policy",
+                 "libgrallocusage",
+                 "libscrypt_static",
+@@ -417,6 +417,7 @@ cc_library_shared_for_libandroid_runtime {
+                 "libimage_type_recognition",
+                 "libinput",
+                 "libjpeg",
++                "libnativehelper_jvm",
+                 "libpiex",
+                 "libpng",
+                 "libtiff_directory",

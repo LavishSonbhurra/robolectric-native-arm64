@@ -1,0 +1,246 @@
+Move android.media.Image* from media to core
+
+Upstream: platform/frameworks/base commit f85416259fd
+
+Why: only the jni files of the commit (the Java side comes from android-all).
+Prerequisite of the next patch, which needs these sources in
+libandroid_runtime.
+
+diff --git a/core/jni/Android.bp b/core/jni/Android.bp
+index 67674ceb974..a105a1ee849 100644
+--- a/core/jni/Android.bp
++++ b/core/jni/Android.bp
+@@ -134,6 +134,10 @@ cc_library_shared_for_libandroid_runtime {
+                 "android_app_ActivityThread.cpp",
+                 "android_app_NativeActivity.cpp",
+                 "android_app_admin_SecurityLog.cpp",
++                "android_media_ImageReader.cpp",
++                "android_media_ImageWriter.cpp",
++                "android_media_PublicFormatUtils.cpp",
++                "android_media_Utils.cpp",
+                 "android_opengl_EGL14.cpp",
+                 "android_opengl_EGL15.cpp",
+                 "android_opengl_EGLExt.cpp",
+@@ -504,3 +508,35 @@ cc_library_shared {
+         "vintf",
+     ],
+ }
++
++cc_library_shared {
++    name: "libmedia_jni_utils",
++    srcs: [
++        ":libgui_frame_event_aidl",
++        "android_media_Utils.cpp",
++    ],
++
++    header_libs: [
++        "libgui_headers",
++    ],
++
++    shared_libs: [
++        "liblog",
++        "libui",
++        "libutils",
++    ],
++
++    include_dirs: [
++        "system/media/camera/include",
++    ],
++
++    export_include_dirs: ["."],
++
++    cflags: [
++        "-Wall",
++        "-Werror",
++        "-Wno-error=deprecated-declarations",
++        "-Wunused",
++        "-Wunreachable-code",
++    ],
++}
+diff --git a/core/jni/AndroidRuntime.cpp b/core/jni/AndroidRuntime.cpp
+index 71d041c1198..3ac5e8a5b11 100644
+--- a/core/jni/AndroidRuntime.cpp
++++ b/core/jni/AndroidRuntime.cpp
+@@ -100,7 +100,10 @@ extern int register_android_media_AudioAttributes(JNIEnv *env);
+ extern int register_android_media_AudioProductStrategies(JNIEnv *env);
+ extern int register_android_media_AudioVolumeGroups(JNIEnv *env);
+ extern int register_android_media_AudioVolumeGroupChangeHandler(JNIEnv *env);
++extern int register_android_media_ImageReader(JNIEnv *env);
++extern int register_android_media_ImageWriter(JNIEnv *env);
+ extern int register_android_media_MicrophoneInfo(JNIEnv *env);
++extern int register_android_media_PublicFormatUtils(JNIEnv *env);
+ extern int register_android_media_ToneGenerator(JNIEnv *env);
+ extern int register_android_media_audio_common_AidlConversion(JNIEnv* env);
+ extern int register_android_media_midi(JNIEnv *env);
+@@ -1628,8 +1631,11 @@ static const RegJNIRec gRegJNI[] = {
+         REG_JNI(register_android_media_AudioProductStrategies),
+         REG_JNI(register_android_media_AudioVolumeGroups),
+         REG_JNI(register_android_media_AudioVolumeGroupChangeHandler),
++        REG_JNI(register_android_media_ImageReader),
++        REG_JNI(register_android_media_ImageWriter),
+         REG_JNI(register_android_media_MediaMetrics),
+         REG_JNI(register_android_media_MicrophoneInfo),
++        REG_JNI(register_android_media_PublicFormatUtils),
+         REG_JNI(register_android_media_RemoteDisplay),
+         REG_JNI(register_android_media_ToneGenerator),
+         REG_JNI(register_android_media_audio_common_AidlConversion),
+diff --git a/media/jni/android_media_ImageReader.cpp b/core/jni/android_media_ImageReader.cpp
+similarity index 99%
+rename from media/jni/android_media_ImageReader.cpp
+rename to core/jni/android_media_ImageReader.cpp
+index 371e3d2deda..3776d4391da 100644
+--- a/media/jni/android_media_ImageReader.cpp
++++ b/core/jni/android_media_ImageReader.cpp
+@@ -13,6 +13,7 @@
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
++#undef ANDROID_UTILS_REF_BASE_DISABLE_IMPLICIT_CONSTRUCTION // TODO:remove this and fix code
+ 
+ //#define LOG_NDEBUG 0
+ #define LOG_TAG "ImageReader_JNI"
+diff --git a/media/jni/android_media_ImageWriter.cpp b/core/jni/android_media_ImageWriter.cpp
+similarity index 99%
+rename from media/jni/android_media_ImageWriter.cpp
+rename to core/jni/android_media_ImageWriter.cpp
+index f64233fb9c7..835e5489b7e 100644
+--- a/media/jni/android_media_ImageWriter.cpp
++++ b/core/jni/android_media_ImageWriter.cpp
+@@ -13,6 +13,7 @@
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
++#undef ANDROID_UTILS_REF_BASE_DISABLE_IMPLICIT_CONSTRUCTION // TODO:remove this and fix code
+ 
+ //#define LOG_NDEBUG 0
+ #define LOG_TAG "ImageWriter_JNI"
+diff --git a/media/jni/android_media_PublicFormatUtils.cpp b/core/jni/android_media_PublicFormatUtils.cpp
+similarity index 100%
+rename from media/jni/android_media_PublicFormatUtils.cpp
+rename to core/jni/android_media_PublicFormatUtils.cpp
+diff --git a/media/jni/android_media_Utils.cpp b/core/jni/android_media_Utils.cpp
+similarity index 100%
+rename from media/jni/android_media_Utils.cpp
+rename to core/jni/android_media_Utils.cpp
+diff --git a/media/jni/android_media_Utils.h b/core/jni/android_media_Utils.h
+similarity index 100%
+rename from media/jni/android_media_Utils.h
+rename to core/jni/android_media_Utils.h
+diff --git a/media/jni/Android.bp b/media/jni/Android.bp
+index e619e1c7425..cc95e0faf65 100644
+--- a/media/jni/Android.bp
++++ b/media/jni/Android.bp
+@@ -25,8 +25,6 @@ cc_library_shared {
+     min_sdk_version: "",
+ 
+     srcs: [
+-        "android_media_ImageWriter.cpp",
+-        "android_media_ImageReader.cpp",
+         "android_media_JetPlayer.cpp",
+         "android_media_MediaCrypto.cpp",
+         "android_media_MediaCodec.cpp",
+@@ -42,7 +40,6 @@ cc_library_shared {
+         "android_media_MediaProfiles.cpp",
+         "android_media_MediaRecorder.cpp",
+         "android_media_MediaSync.cpp",
+-        "android_media_PublicFormatUtils.cpp",
+         "android_media_ResampleInputStream.cpp",
+         "android_media_Streams.cpp",
+         "android_media_SyncParams.cpp",
+@@ -64,7 +61,6 @@ cc_library_shared {
+         "libbinder",
+         "libmedia",
+         "libmedia_codeclist",
+-        "libmedia_jni_utils",
+         "libmedia_omx",
+         "libmediametrics",
+         "libmediadrm",
+@@ -132,38 +128,6 @@ cc_library_shared {
+     lto_O0: true,
+ }
+ 
+-cc_library_shared {
+-    name: "libmedia_jni_utils",
+-    srcs: [
+-        ":libgui_frame_event_aidl",
+-        "android_media_Utils.cpp",
+-    ],
+-
+-    header_libs: [
+-        "libgui_headers",
+-    ],
+-
+-    shared_libs: [
+-        "liblog",
+-        "libui",
+-        "libutils",
+-    ],
+-
+-    include_dirs: [
+-        "system/media/camera/include",
+-    ],
+-
+-    export_include_dirs: ["."],
+-
+-    cflags: [
+-        "-Wall",
+-        "-Werror",
+-        "-Wno-error=deprecated-declarations",
+-        "-Wunused",
+-        "-Wunreachable-code",
+-    ],
+-}
+-
+ cc_library_shared {
+     name: "libmedia_tv_tuner",
+     min_sdk_version: "",
+diff --git a/media/jni/android_media_MediaPlayer.cpp b/media/jni/android_media_MediaPlayer.cpp
+index d05ee551c17..97ada71cacd 100644
+--- a/media/jni/android_media_MediaPlayer.cpp
++++ b/media/jni/android_media_MediaPlayer.cpp
+@@ -1462,8 +1462,6 @@ static int register_android_media_MediaPlayer(JNIEnv *env)
+     return AndroidRuntime::registerNativeMethods(env,
+                 "android/media/MediaPlayer", gMethods, NELEM(gMethods));
+ }
+-extern int register_android_media_ImageReader(JNIEnv *env);
+-extern int register_android_media_ImageWriter(JNIEnv *env);
+ extern int register_android_media_JetPlayer(JNIEnv *env);
+ extern int register_android_media_Crypto(JNIEnv *env);
+ extern int register_android_media_Drm(JNIEnv *env);
+@@ -1476,7 +1474,6 @@ extern int register_android_media_MediaMetadataRetriever(JNIEnv *env);
+ extern int register_android_media_MediaMuxer(JNIEnv *env);
+ extern int register_android_media_MediaRecorder(JNIEnv *env);
+ extern int register_android_media_MediaSync(JNIEnv *env);
+-extern int register_android_media_PublicFormatUtils(JNIEnv *env);
+ extern int register_android_media_ResampleInputStream(JNIEnv *env);
+ extern int register_android_media_MediaProfiles(JNIEnv *env);
+ extern int register_android_mtp_MtpDatabase(JNIEnv *env);
+@@ -1494,16 +1491,6 @@ jint JNI_OnLoad(JavaVM* vm, void* /* reserved */)
+     }
+     assert(env != NULL);
+ 
+-    if (register_android_media_ImageWriter(env) != JNI_OK) {
+-        ALOGE("ERROR: ImageWriter native registration failed");
+-        goto bail;
+-    }
+-
+-    if (register_android_media_ImageReader(env) < 0) {
+-        ALOGE("ERROR: ImageReader native registration failed");
+-        goto bail;
+-    }
+-
+     if (register_android_media_JetPlayer(env) < 0) {
+         ALOGE("ERROR: JetPlayer native registration failed");
+         goto bail;
+@@ -1524,11 +1511,6 @@ jint JNI_OnLoad(JavaVM* vm, void* /* reserved */)
+         goto bail;
+     }
+ 
+-    if (register_android_media_PublicFormatUtils(env) < 0) {
+-        ALOGE("ERROR: PublicFormatUtils native registration failed\n");
+-        goto bail;
+-    }
+-
+     if (register_android_media_ResampleInputStream(env) < 0) {
+         ALOGE("ERROR: ResampleInputStream native registration failed\n");
+         goto bail;

@@ -1,0 +1,46 @@
+Only use libicu for Android builds
+
+Upstream: platform/frameworks/minikin commit ab6c0e5, Jerome Gaillard, 2024-07-16.
+
+Why: at r1 libminikin links the libicu shim on host too. The shim references
+the whole ICU C API, which pulls in collation, transliteration, date
+formatting and more. The official library has none of their strings
+(DateTimePatterns, Translit, +Infinity), so it links ICU directly.
+
+diff --git a/libs/minikin/Android.bp b/libs/minikin/Android.bp
+index 33b8977..4927e6b 100644
+--- a/libs/minikin/Android.bp
++++ b/libs/minikin/Android.bp
+@@ -45,12 +45,26 @@ cc_library_static {
+     lto: {
+         never: true,
+     },
+-    shared_libs: [
+-        "libicu",
+-    ],
+-    export_shared_lib_headers: [
+-        "libicu",
+-    ],
++    target: {
++        android: {
++            shared_libs: [
++                "libicu",
++            ],
++            export_shared_lib_headers: [
++                "libicu",
++            ],
++        },
++        host: {
++            shared_libs: [
++                "libicui18n",
++                "libicuuc",
++            ],
++            export_shared_lib_headers: [
++                "libicui18n",
++                "libicuuc",
++            ],
++        },
++    },
+ }
+ 
+ cc_library {

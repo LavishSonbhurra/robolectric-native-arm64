@@ -1,0 +1,27 @@
+# Pin for libandroid_runtime.so for SDK 35 (RA64_TARGET=sdk35, see
+# tools/target.py), as shipped in android-all 15-robolectric-13954326.
+# docs/SDK35.md records why this tag was chosen.
+
+[aosp]
+gitiles = "https://android.googlesource.com"
+tag = "android-15.0.0_r1"
+
+[release]
+# ap3a is the Android 15 release config at this tag (aosp_current aliases it).
+config = "ap3a"
+variant = "user"
+
+[variant]
+os = "linux_glibc"
+arch = "arm64"
+# Soong's global flags as of this tree's build/soong (tools/soong_flags_v.py).
+soong = "android15"
+
+[rust]
+# rust/config/global.go RustDefaultVersion at this tag. The official library
+# carries the same rustc commit (/rustc/9b00956e56.../library/...).
+version = "1.78.0"
+toolchain = "rust/toolchain-1.78.0"
+# external/rust/cxx/macro is 1.0.119 at this tag; its Android.bp still says
+# 1.0.93. The crate's own Cargo.toml is what counts.
+stale_cargo_pkg_version = ["libcxxbridge_macro"]

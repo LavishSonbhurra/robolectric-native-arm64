@@ -1,0 +1,82 @@
+tracing_perfetto: on host, trace through cutils only, without the Perfetto SDK
+
+Not an upstream commit. The official library has the android.os.Trace table of
+this tag but no Perfetto SDK: no perfetto strings, no libtracing_perfetto or
+libperfetto_c NEEDED entry. Its natives are, from the x86_64 disassembly:
+nativeRegisterWithPerfetto is an empty function, nativeTraceBegin tests
+atrace_get_enabled_tags() and calls atrace_begin_body, nativeIsTagEnabled is
+atrace_get_enabled_tags() & tag. That is tracing_perfetto.cpp with every
+category lookup returning nullptr, so the patch builds exactly that on host.
+On Android nothing changes. On main the same dependency was removed by
+ce5321e824c "Remove native support for tracing in host runtime", which also
+drops the Trace table; the official SDK 35 library keeps the table.
+
+diff --git a/libs/tracing_perfetto/Android.bp b/libs/tracing_perfetto/Android.bp
+index 3a4c869..f738211 100644
+--- a/libs/tracing_perfetto/Android.bp
++++ b/libs/tracing_perfetto/Android.bp
+@@ -36,14 +36,23 @@ cc_library_shared {
+ 
+     srcs: [
+         "tracing_perfetto.cpp",
+-        "tracing_perfetto_internal.cpp",
+     ],
+ 
+     shared_libs: [
+         "libcutils",
+-        "libperfetto_c",
+-        "android.os.flags-aconfig-cc-host",
+     ],
+ 
++    target: {
++        android: {
++            srcs: [
++                "tracing_perfetto_internal.cpp",
++            ],
++            shared_libs: [
++                "libperfetto_c",
++                "android.os.flags-aconfig-cc-host",
++            ],
++        },
++    },
++
+     host_supported: true,
+ }
+diff --git a/libs/tracing_perfetto/tracing_perfetto.cpp b/libs/tracing_perfetto/tracing_perfetto.cpp
+index 6f716ee..b8ce55a 100644
+--- a/libs/tracing_perfetto/tracing_perfetto.cpp
++++ b/libs/tracing_perfetto/tracing_perfetto.cpp
+@@ -18,12 +18,33 @@
+ 
+ #include <cutils/trace.h>
+ 
++#ifdef __ANDROID__
+ #include "perfetto/public/te_category_macros.h"
+ #include "trace_categories.h"
+ #include "tracing_perfetto_internal.h"
++#else
++struct PerfettoTeCategory;
++#endif
+ 
+ namespace tracing_perfetto {
+ 
++#ifndef __ANDROID__
++// Host: no Perfetto SDK. Every category lookup fails, so all paths below go to atrace.
++namespace internal {
++static inline void registerWithPerfetto(bool) {}
++static inline PerfettoTeCategory* toPerfettoCategory(uint64_t) { return nullptr; }
++static inline Result perfettoTraceBegin(PerfettoTeCategory&, const char*) { return Result::SUCCESS; }
++static inline Result perfettoTraceEnd(PerfettoTeCategory&) { return Result::SUCCESS; }
++static inline Result perfettoTraceAsyncBegin(PerfettoTeCategory&, const char*, int32_t) { return Result::SUCCESS; }
++static inline Result perfettoTraceAsyncEnd(PerfettoTeCategory&, const char*, int32_t) { return Result::SUCCESS; }
++static inline Result perfettoTraceAsyncBeginForTrack(PerfettoTeCategory&, const char*, const char*, int32_t) { return Result::SUCCESS; }
++static inline Result perfettoTraceAsyncEndForTrack(PerfettoTeCategory&, const char*, int32_t) { return Result::SUCCESS; }
++static inline Result perfettoTraceInstant(PerfettoTeCategory&, const char*) { return Result::SUCCESS; }
++static inline Result perfettoTraceInstantForTrack(PerfettoTeCategory&, const char*, const char*) { return Result::SUCCESS; }
++static inline Result perfettoTraceCounter(PerfettoTeCategory&, const char*, int64_t) { return Result::SUCCESS; }
++}  // namespace internal
++#endif
++
+ void registerWithPerfetto(bool test) {
+   internal::registerWithPerfetto(test);
+ }

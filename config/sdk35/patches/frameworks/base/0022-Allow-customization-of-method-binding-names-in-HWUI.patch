@@ -1,0 +1,25 @@
+Allow customization of method binding names in HWUI
+
+Upstream: platform/frameworks/base commit 68a4e350155
+
+Why: same mechanism in hwui's LayoutlibLoader. Without it the hwui natives would
+not bind under the format the Robolectric loader sets.
+
+diff --git a/libs/hwui/apex/LayoutlibLoader.cpp b/libs/hwui/apex/LayoutlibLoader.cpp
+index b4e6b7243dd..56191c01aae 100644
+--- a/libs/hwui/apex/LayoutlibLoader.cpp
++++ b/libs/hwui/apex/LayoutlibLoader.cpp
+@@ -205,6 +205,13 @@ int register_android_graphics_classes(JNIEnv *env) {
+     jmethodID getPropertyMethod = GetStaticMethodIDOrDie(env, system, "getProperty",
+                                                          "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+ 
++    auto formatProperty = (jstring)env->CallStaticObjectMethod(
++            system, getPropertyMethod, env->NewStringUTF("method_binding_format"),
++            env->NewStringUTF(""));
++    const char* methodFormatChars = env->GetStringUTFChars(formatProperty, 0);
++    setJniMethodFormat(string(methodFormatChars));
++    env->ReleaseStringUTFChars(formatProperty, methodFormatChars);
++
+     // Get the names of classes that need to register their native methods
+     auto nativesClassesJString = (jstring)env->CallStaticObjectMethod(
+             system, getPropertyMethod, env->NewStringUTF("graphics_native_classes"),

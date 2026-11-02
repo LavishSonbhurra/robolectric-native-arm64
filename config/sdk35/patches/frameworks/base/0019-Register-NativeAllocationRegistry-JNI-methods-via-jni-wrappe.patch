@@ -1,0 +1,22 @@
+Register NativeAllocationRegistry JNI methods via jni wrappers
+
+Upstream: platform/frameworks/base commit d6a86e84998
+
+Why: registration goes through jni_wrappers so that the method_binding_format
+applies to it too. Follows from the previous method_binding_format patches.
+
+diff --git a/core/jni/platform/host/HostRuntime.cpp b/core/jni/platform/host/HostRuntime.cpp
+index c5382fe0dae..8b015d20f1d 100644
+--- a/core/jni/platform/host/HostRuntime.cpp
++++ b/core/jni/platform/host/HostRuntime.cpp
+@@ -64,8 +64,8 @@ static JNINativeMethod gMethods[] = {
+ };
+ 
+ int register_libcore_util_NativeAllocationRegistry(JNIEnv* env) {
+-    return jniRegisterNativeMethods(env, "libcore/util/NativeAllocationRegistry", gMethods,
+-                                    NELEM(gMethods));
++    return android::RegisterMethodsOrDie(env, "libcore/util/NativeAllocationRegistry", gMethods,
++                                         NELEM(gMethods));
+ }
+ 
+ namespace android {
