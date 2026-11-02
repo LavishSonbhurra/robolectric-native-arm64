@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Runs Robolectric 4.17's own test suites (harness/) in one mode, at SDK 36 or (SDKS) at SDK 26 to 34.
-#   arm64  aarch64 JDK 21, the loader plugin (injected by an init script) and the arm64 library
+# Runs Robolectric 4.17's own test suites (harness/) in one mode, at SDK 36 or at the SDKS given.
+#   arm64  aarch64 JDK 21, the loader plugin (injected by an init script) and the arm64 library,
+#          from a file (ARM64_LIB) or from the published artifacts (ARTIFACT_REPO)
 #   x86    x86_64 JDK 21 (under qemu-user on an arm64 host), the stock loader and the official
 #          library from android-all, as the reference
 #   none   the harness as is: stock loader on the test JVM, nothing injected
@@ -9,10 +10,15 @@
 # Results go to results/<name>/: gradle.log, _run.txt and junit/<module>/*.xml.
 #
 # Environment (all optional unless noted):
+#   ARTIFACT_REPO    Maven repository with the published artifacts, for example build/central-staging.
+#                    The suites then depend on the loader artifact alone and get the libraries
+#                    through its POM. ARM64_LIB, LOADER_JAR and arm64.nativeLibrarySdk are not used
+#   ARTIFACT_VERSION version of robolectric-nativeruntime-linux-aarch64 in that repository
 #   ARM64_LIB        library under test (default <repo>/build/out/lib/libandroid_runtime.so, or
 #                    <repo>/build/compat/lib/librobolectric-nativeruntime.so when SDKS are all < 35)
-#   SDKS             SDK levels to run, comma separated (default 36). Levels 26 to 34 use the
-#                    SDK <= 34 library; do not mix them with 35+ in one run
+#   SDKS             SDK levels to run, comma separated (default 36). With ARM64_LIB, levels 26 to
+#                    34 use the SDK <= 34 library, and one file fits one SDK level from 35 on:
+#                    pass -Parm64.nativeLibrarySdk for it. Do not mix those in one run
 #   LOADER_JAR       loader plugin jar (default: built with ./gradlew :loader:jar at the repo root)
 #   JAVA_HOME        JDK 21 that runs Gradle; also the test JVM in arm64 mode unless SUITE_JAVA is set
 #   SUITE_JAVA       java executable for the test JVM
@@ -57,20 +63,24 @@ compat=1
 for s in ${SDKS//,/ }; do [ "$s" -ge 35 ] && compat=0; done
 case "$MODE" in
   arm64)
-    if [ "$compat" = 1 ]; then deflib="$REPO/build/compat/lib/librobolectric-nativeruntime.so"
-    else deflib="$REPO/build/out/lib/libandroid_runtime.so"; fi
-    lib="${ARM64_LIB:-$deflib}"
-    [ -f "$lib" ] || { echo "no library at $lib (set ARM64_LIB)" >&2; exit 1; }
-    jar="${LOADER_JAR:-}"
-    if [ -z "$jar" ]; then
-      "$GRADLE" --no-daemon -q -p "$REPO" :loader:jar || exit 1
-      jar="$(ls "$REPO"/loader/build/libs/*.jar 2>/dev/null | grep -vE -- '-(sources|javadoc)\.jar$' | head -n 1)"
-      [ -n "$jar" ] || { echo "no jar in $REPO/loader/build/libs" >&2; exit 1; }
+    args+=(-I "$W/scripts/arm64.init.gradle.kts")
+    if [ -n "${ARTIFACT_REPO:-}" ]; then
+      args+=("-Parm64.artifactRepo=$(cd "$ARTIFACT_REPO" && pwd)" "-Parm64.artifactVersion=$ARTIFACT_VERSION")
+    else
+      if [ "$compat" = 1 ]; then deflib="$REPO/build/compat/lib/librobolectric-nativeruntime.so"
+      else deflib="$REPO/build/out/lib/libandroid_runtime.so"; fi
+      lib="${ARM64_LIB:-$deflib}"
+      [ -f "$lib" ] || { echo "no library at $lib (set ARM64_LIB)" >&2; exit 1; }
+      jar="${LOADER_JAR:-}"
+      if [ -z "$jar" ]; then
+        "$GRADLE" --no-daemon -q -p "$REPO" :loader:jar || exit 1
+        jar="$(ls "$REPO"/loader/build/libs/*.jar 2>/dev/null | grep -vE -- '-(sources|javadoc)\.jar$' | head -n 1)"
+        [ -n "$jar" ] || { echo "no jar in $REPO/loader/build/libs" >&2; exit 1; }
+      fi
+      args+=("-Parm64.loaderJar=$(cd "$(dirname "$jar")" && pwd)/$(basename "$jar")"
+             "-Parm64.nativeLibrary=$(cd "$(dirname "$lib")" && pwd)/$(basename "$lib")")
+      [ "$compat" = 1 ] && args+=("-Parm64.nativeLibrarySdk=34")
     fi
-    args+=(-I "$W/scripts/arm64.init.gradle.kts"
-           "-Parm64.loaderJar=$(cd "$(dirname "$jar")" && pwd)/$(basename "$jar")"
-           "-Parm64.nativeLibrary=$(cd "$(dirname "$lib")" && pwd)/$(basename "$lib")")
-    [ "$compat" = 1 ] && args+=("-Parm64.nativeLibrarySdk=34")
     [ -n "${SUITE_JAVA:-}" ] && args+=("-Psuite.java=$SUITE_JAVA") ;;
   x86)
     [ -n "${X86_JAVA:-}" ] || { echo "mode x86 needs X86_JAVA (an x86_64 JDK 21 java)" >&2; exit 2; }

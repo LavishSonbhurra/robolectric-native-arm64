@@ -4,6 +4,18 @@ These steps build `libandroid_runtime.so` for SDK 36 from the AOSP tag `android-
 run end to end on Ubuntu 26.04 arm64, for both target architectures. `ci/build.sh` runs the same
 sequence for the arm64 release build, plus the checks, stripping and checksums.
 
+One tree builds every library. `RA64_TARGET` picks one, and each target has its own sources, build
+directory and Rust:
+
+| Target | Library | AOSP | Rust | Sources | Clean build, 2 cores, `-j2` | Stripped size |
+| --- | --- | --- | --- | --- | --- | --- |
+| `sdk35` | `libandroid_runtime.so`, SDK 35 | `android-15.0.0_r1` plus 36 patches | 1.78.0 | `src-sdk35/`, 0.9 GB | 68 min | 14.6 MB |
+| `sdk36` (default) | `libandroid_runtime.so`, SDK 36 | `android-16.0.0_r1` | 1.83.0 | `src/`, 0.9 GB | 35 to 45 min | 15.2 MB |
+| `sdk37` | `libandroid_runtime.so`, SDK 37 | `android-17.0.0_r1` plus 3 patches | 1.93.1 | `src-sdk37/`, 1.8 GB | 2 h 23 min | 24.0 MB |
+| `compat` | `librobolectric-nativeruntime.so`, SDK 26 to 34 | `android12-hostruntime-dev` | none | `src-compat/` | 20 min | 15.3 MB |
+
+The steps below are for `sdk36`. For the others, see "The other targets".
+
 ## Requirements
 
 * An arm64 Linux machine. The instructions assume Ubuntu 26.04; other distributions need the same tools
@@ -15,8 +27,11 @@ sequence for the arm64 release build, plus the checks, stripping and checksums.
 
 ```
 sudo apt-get install clang lld llvm cmake ninja-build python3 patch libc++-21-dev libc++abi-21-dev \
-    rustc cargo flex bison git curl xz-utils ca-certificates gnupg gpgv debian-archive-keyring
+    rustc cargo flex bison git curl xz-utils ca-certificates gnupg gpgv debian-archive-keyring \
+    libclang1-21
 ```
+
+`libclang1-21` is for bindgen, which only the `sdk37` target runs.
 
 ## Release build (arm64, glibc 2.31 floor)
 
@@ -59,6 +74,28 @@ Without `-DRA64_USE_SYSROOT=ON` (and without the sysroot and runtime steps) the 
 the machine's own glibc and libc++. That is faster to set up, but the result is only guaranteed to
 load on the machine that built it.
 
+## The other targets
+
+Each one needs its own Rust, because Soong's Rust version is pinned per AOSP release and the library
+holds that compiler's standard library. They install next to each other under `rust/`.
+
+```
+rust/install-toolchain.sh --version 1.78.0      # rust/toolchain-1.78.0, for sdk35
+RA64_TARGET=sdk35 python3 -I tools/fetch.py     # src-sdk35/
+cmake -S . -B build/sdk35 -G Ninja -DRA64_TARGET=sdk35 -DRA64_USE_SYSROOT=ON
+ninja -C build/sdk35 -j2
+
+rust/install-toolchain.sh --version 1.93.1      # rust/toolchain-1.93.1, for sdk37
+RA64_TARGET=sdk37 python3 -I tools/fetch.py     # src-sdk37/
+cmake -S . -B build/sdk37 -G Ninja -DRA64_TARGET=sdk37 -DRA64_USE_SYSROOT=ON
+ninja -C build/sdk37 -j2
+```
+
+The sysroot and the C++ runtimes are shared. `ci/build.sh --sdk 35` does all of it with the checks,
+stripping and checksums, and `ci/build-compat.sh` does the same for `compat`. `ci/sdk-env.sh` lists what
+differs between the targets. Inputs and results per target: [SDK35.md](SDK35.md), [SDK37.md](SDK37.md),
+[COMPAT.md](COMPAT.md).
+
 ## x86_64 build (control build)
 
 The same tree builds for x86_64, cross-compiled on arm64. The build-time code generators are taken from
@@ -94,22 +131,34 @@ python3 -I tools/jni_tables.py dynsym ref/libandroid_runtime.so build/out/lib/li
 Use the unstripped library: the comparison groups methods into tables by our symbols. `ref/` is in
 `.gitignore`; do not commit the official library.
 
-## The loader jar
+## The jars
 
-The loader plugin lives in `loader/`. To build the jar with your library inside:
+The loader is a jar of its own and holds no library. Each library has its own jar. Strip the library
+first (`ci/build.sh` does) if the jar is meant for distribution.
 
 ```
-./gradlew :loader:jar -Pra64.nativeLib=$PWD/build/out/lib/libandroid_runtime.so
+./gradlew :loader:jar
+./gradlew :sdk35:jar -Pra64.sdk35Lib=$PWD/dist/libandroid_runtime.so   # also :sdk36, :sdk37
+./gradlew :compat:jar -Pra64.compatLib=$PWD/dist-compat/librobolectric-nativeruntime.so
 ```
 
-Strip the library first (`llvm-strip --strip-all`) if the jar is meant for distribution. To test a
-library without building a jar, pass `-Drobolectric.arm64.nativeLibrary=/abs/path/libandroid_runtime.so`
-to the test JVM.
+The notices file next to the library goes into the jar. All of them together, as a Maven repository in
+`build/central-staging` (each library needs its property):
+
+```
+./gradlew publishAllPublicationsToStagingRepository -Pra64.sdk35Lib=... -Pra64.sdk36Lib=... \
+    -Pra64.sdk37Lib=... -Pra64.compatLib=... -Pra64.compatX86Lib=...
+```
+
+To test a library without building a jar, pass
+`-Drobolectric.arm64.nativeLibrary=/abs/path/libandroid_runtime.so` to the test JVM, with
+`-Drobolectric.arm64.nativeLibrarySdk=<sdk>` if it is not for SDK 36.
 
 ## Tests
 
 * `tests/rig/`: the fidelity rig. It renders 37 scenes with the library and compares them with goldens
-  made by the official x86_64 library. See `tests/rig/README.md`.
+  made by the official x86_64 library, one set per SDK. `RIG_ARTIFACT_REPO` runs it through the jars in
+  a Maven repository, the way a user's build gets them. See `tests/rig/README.md`.
 * `tests/upstream/`: runs Robolectric's own test suites against the library. See
   `tests/upstream/README.md`.
 
@@ -123,6 +172,10 @@ prints how a module was resolved (variants, defaults, `select()` branches) and i
 command lines.
 
 ## Moving to another AOSP release
+
+A new SDK level gets its own target, as `config/sdk35/` and `config/sdk37/` did: a directory with the
+files below, a branch in `tools/target.py` and `CMakeLists.txt`, an entry in `ci/sdk-env.sh`, a project
+under `libraries/` and a value for `NEWEST_LIBRARY_SDK` in the loader. The steps are the same either way.
 
 1. Edit `config/aosp.toml` (tag, release config).
 2. Run `tools/fetch.py`. It resolves every project again, and `config/sources.lock.json` changes

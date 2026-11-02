@@ -1,0 +1,3 @@
+reference: 89 runs, 1380 methods
+ours:      114 tables, 1380 methods
+JNI tables: identical (same tables, same methods, same order within each table)

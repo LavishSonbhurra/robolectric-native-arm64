@@ -23,6 +23,16 @@ import org.robolectric.nativeruntime.DefaultNativeRuntimeLoader
 class LoaderProbeTest {
     @Test
     fun recordLoader() {
+        record()
+        // One native draw, so a library that loads but cannot render also shows up here.
+        val b = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        Canvas(b).drawCircle(2f, 2f, 2f, Paint().apply { color = Color.RED; isAntiAlias = true })
+        // Below SDK 35 the library loads at the first native call, so record again after the draw.
+        record()
+        check(b.getPixel(2, 2) == Color.RED) { "native draw gave ${Integer.toHexString(b.getPixel(2, 2))}" }
+    }
+
+    private fun record() {
         val field = DefaultNativeRuntimeLoader::class.java.getDeclaredField("nativeRuntimeLoader").apply { isAccessible = true }
         val chosen = (field.get(null) as AtomicReference<*>).get()
         val lines = listOf(
@@ -32,9 +42,5 @@ class LoaderProbeTest {
             "java.version=${System.getProperty("java.version")}",
         )
         java.io.File(Out.dir, "_loader.txt").writeText(lines.joinToString("\n", postfix = "\n"))
-        // One native draw, so a library that loads but cannot render also shows up here.
-        val b = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
-        Canvas(b).drawCircle(2f, 2f, 2f, Paint().apply { color = Color.RED; isAntiAlias = true })
-        check(b.getPixel(2, 2) == Color.RED) { "native draw gave ${Integer.toHexString(b.getPixel(2, 2))}" }
     }
 }

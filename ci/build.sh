@@ -5,9 +5,11 @@
 # Ubuntu 26.04 arm64 machine with the packages from docs/BUILDING.md (or the workflow's PACKAGES)
 # installed.
 #
-#   ci/build.sh [-j N] [--out DIR]
+#   ci/build.sh [-j N] [--out DIR] [--sdk 35|36|37]
 #
-# Steps: fetch pinned sources (verified against config/sources.lock.json), install the pinned Rust
+# --sdk picks the library (default 36). ci/sdk-env.sh has what differs: sources, build directory, Rust.
+#
+# Steps: fetch pinned sources (verified against the target's sources.lock.json), install the pinned Rust
 # toolchain, build the Debian 11 sysroot and the static C++ runtimes, configure, build, run the
 # static checks, strip, generate the third-party notices, write checksums.
 # Everything is verified by the scripts it calls (content hashes, SHA-256 pins, signatures); the
@@ -16,17 +18,21 @@ set -euo pipefail
 
 JOBS=$(nproc)
 OUT=dist
+SDK=36
 while [ $# -gt 0 ]; do
   case $1 in
     -j) JOBS=$2; shift 2 ;;
     -j?*) JOBS=${1#-j}; shift ;;
     --out) OUT=$2; shift 2 ;;
-    *) echo "usage: $0 [-j N] [--out DIR]" >&2; exit 2 ;;
+    --sdk) SDK=$2; shift 2 ;;
+    *) echo "usage: $0 [-j N] [--out DIR] [--sdk 35|36|37]" >&2; exit 2 ;;
   esac
 done
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
+eval "$(ci/sdk-env.sh "$SDK")"
+export RA64_TARGET=$TARGET
 
 # Settings that keep the output independent of the machine (see docs/reproducibility.md).
 export LC_ALL=C.UTF-8 TZ=UTC PYTHONHASHSEED=0
@@ -35,9 +41,9 @@ if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
   export SOURCE_DATE_EPOCH
 fi
 
-BUILD=build/out
+BUILD=$BUILD_DIR
 LIB=$BUILD/lib/libandroid_runtime.so
-VERSION_SCRIPT=src/frameworks/base/core/jni/platform/linux/libandroid_runtime_export.txt
+VERSION_SCRIPT=$SRC_DIR/frameworks/base/core/jni/platform/linux/libandroid_runtime_export.txt
 
 group() { echo "::group::$*"; }
 endgroup() { echo "::endgroup::"; }
@@ -47,19 +53,19 @@ lap() { echo "== $1: $(( $(date +%s) - t0 )) s elapsed, $(df -h --output=avail .
 group "fetch sources"
 python3 -I tools/fetch.py
 if [ -d .git ]; then
-  git diff --exit-code -- config/sources.lock.json \
-    || { echo "fetch.py changed config/sources.lock.json: the pin and the lock disagree"; exit 1; }
+  git diff --exit-code -- "$CONFIG_DIR/sources.lock.json" \
+    || { echo "fetch.py changed $CONFIG_DIR/sources.lock.json: the pin and the lock disagree"; exit 1; }
 fi
 endgroup; lap fetch
 
 group "toolchains"
-rust/install-toolchain.sh
+rust/install-toolchain.sh --version "$RUST_VERSION"
 python3 -I toolchain/make-sysroot.py
 toolchain/build-runtimes.sh -j"$JOBS"
 endgroup; lap toolchains
 
 group "configure"
-cmake -S . -B "$BUILD" -G Ninja -DRA64_USE_SYSROOT=ON
+cmake -S . -B "$BUILD" -G Ninja -DRA64_TARGET="$TARGET" -DRA64_USE_SYSROOT=ON
 endgroup; lap configure
 
 group "build"
@@ -69,7 +75,7 @@ endgroup; lap build
 group "checks"
 # The link already runs check-so.py; running it again here makes the CI log self-contained.
 python3 -I toolchain/check-so.py --floor 2.31 --version-script "$VERSION_SCRIPT" "$LIB"
-python3 -I tools/check_notice_holders.py --src src --closure "$BUILD/cmake-gen/closure.json" \
+python3 -I tools/check_notice_holders.py --src "$SRC_DIR" --closure "$BUILD/cmake-gen/closure.json" \
   --module libandroid_runtime --archives "$BUILD/notices/libandroid_runtime/archives.tsv" \
   --why-extract "$BUILD/notices/libandroid_runtime/why-extract.tsv" --notice "$BUILD/lib/NOTICE"
 endgroup
@@ -85,12 +91,13 @@ cp "$BUILD/lib/NOTICE" "$OUT/THIRD_PARTY_NOTICES"
 cp "$BUILD/notices/libandroid_runtime/notices.json" "$OUT/"
 {
   echo "commit=$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+  echo "target=$TARGET"
   echo "source_date_epoch=$SOURCE_DATE_EPOCH"
-  echo "aosp_tag=$(sed -n 's/^tag *= *"\(.*\)"/\1/p' config/aosp.toml)"
-  echo "sources_lock_sha256=$(sha256sum config/sources.lock.json | cut -d' ' -f1)"
+  echo "aosp_tag=$(sed -n 's/^tag *= *"\(.*\)"/\1/p' "$CONFIG_DIR/aosp.toml")"
+  echo "sources_lock_sha256=$(sha256sum "$CONFIG_DIR/sources.lock.json" | cut -d' ' -f1)"
   echo "clang=$(clang --version | head -1)"
   echo "lld=$(ld.lld --version | head -1)"
-  echo "rustc_staticlib=$(rust/toolchain/bin/rustc --version)"
+  echo "rustc_staticlib=$("$RUST_DIR/bin/rustc" --version)"
   echo "cmake=$(cmake --version | head -1)"
   echo "ninja=$(ninja --version)"
   echo "build_id=$(readelf -n "$OUT/libandroid_runtime.so" | sed -n 's/.*Build ID: //p')"

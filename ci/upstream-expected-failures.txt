@@ -2,6 +2,7 @@
 # Source: tests/upstream run of 2026-10-19 (robotests 7865/14, nativegraphics 767/1, ctesque 427/0).
 # Causes: 13 tests force LEGACY sqlite4java (no linux-aarch64 native), one runs at SDK 37, and
 # ShadowNativeTableMaskFilterTest fails the same way with the official library. See README.md.
+# testNewestSdk fails only with ARM64_LIB, as CI runs it. Through the published artifacts it passes.
 # A test failing that is not listed here fails the CI job; a listed test passing is reported only.
 robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	uniqueConstraintViolation_errorMessage
 robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	error_resultsInSpecificExceptionWithCause

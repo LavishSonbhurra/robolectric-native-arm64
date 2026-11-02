@@ -1,8 +1,9 @@
 # Robolectric's own test suites on the arm64 library
 
-This directory runs three of Robolectric 4.17's own test suites at SDK 36 against the arm64
-`libandroid_runtime.so`, with the loader plugin from `loader/` injected into the build. It is the
-broad compatibility check; `tests/rig/` is the pixel-level one.
+This directory runs three of Robolectric 4.17's own test suites at one SDK against the arm64
+library for that SDK, either from a file with the loader jar injected into the build, or from the
+published artifacts (`ARTIFACT_REPO`). It is the broad compatibility check; `tests/rig/` is the
+pixel-level one.
 
 | Module | Upstream sources | Notes |
 | --- | --- | --- |
@@ -10,9 +11,9 @@ broad compatibility check; `tests/rig/` is the pixel-level one.
 | `nativegraphics` | `integration_tests/nativegraphics` | |
 | `ctesque` | `integration_tests/ctesque` (`sharedTest`) | with `testapp` |
 
-All tests run with `-Drobolectric.enabledSdks=36`. Robolectric 4.17 defaults to the native
-SQLite mode, so every SDK 36 test in these modules loads `libandroid_runtime`, not only the
-graphics ones. Each module also gets `harness/probe/`, one test that prints which library file
+All tests run with `-Drobolectric.enabledSdks=<SDK>`, 36 by default (`SDKS`). Robolectric 4.17
+defaults to the native SQLite mode, so every test at SDK 35 and up loads `libandroid_runtime`, not
+only the graphics ones. Each module also gets `harness/probe/`, one test that prints which library file
 the test JVM mapped.
 
 ## Layout
@@ -72,10 +73,12 @@ python3 -I ci/check-upstream-failures.py tests/upstream/results/full/junit \
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
+| `ARTIFACT_REPO`, `ARTIFACT_VERSION` | none | a Maven repository with the published artifacts (`build/central-staging`) and the loader version in it. The suites then depend on the loader artifact alone and get the libraries through its POM, as a user does. Use this for a result about what ships |
 | `ARM64_LIB` | `build/out/lib/libandroid_runtime.so` | library under test |
 | `LOADER_JAR` | built from `loader/` | loader plugin jar |
 | `JAVA_HOME` | (from the environment) | JDK 21 for Gradle, and the arm64 test JVM |
 | `SUITE_JAVA` | `$JAVA_HOME/bin/java` | java executable of the test JVM |
+| `SDKS` | `36` | SDK levels to run, comma separated. With `ARM64_LIB` a file fits one level, so pass `-Parm64.nativeLibrarySdk` too |
 | `GRADLE` | the repository's `gradlew` | Gradle 8.13 command |
 | `X86_JAVA` | none | x86_64 JDK 21 `java`, required for mode `x86` |
 | `QEMU_LD_PREFIX` | none | x86_64 sysroot for qemu-user (mode `x86`) |
@@ -87,16 +90,19 @@ Mode `x86` runs the same suites on an x86_64 JDK with the stock loader and the o
 from `android-all`. On an arm64 host that means qemu-user, and it is slow: the subset below took
 42 minutes, and the full robotests suite was stopped after 25 minutes without finishing a class.
 
-Gradle-level properties: `-Psuite.heap=3g` (test JVM heap, default 2g), `-Psuite.sdks=36`, and
+Gradle-level properties: `-Psuite.heap=3g` (test JVM heap, default 2g), `-Psuite.sdks=36`,
+`-Psuite.espresso=3.8.0-alpha03` (needed at SDK 37, where Espresso 3.7.0 fails), and
 `-Psuite.robotests.exclude=**/FooTest.java,...` for more exclusions.
 
 The plugin can be injected into any Robolectric 4.17 build the same way:
 
 ```sh
 gradle -I tests/upstream/scripts/arm64.init.gradle.kts \
-    -Parm64.loaderJar=/abs/path/loader.jar \
-    -Parm64.nativeLibrary=/abs/path/libandroid_runtime.so test
+    -Parm64.artifactRepo=/abs/path/central-staging -Parm64.artifactVersion=4.17-1 test
 ```
+
+or, for one library file, with `-Parm64.loaderJar=/abs/path/loader.jar`,
+`-Parm64.nativeLibrary=/abs/path/libandroid_runtime.so` and `-Parm64.nativeLibrarySdk=<sdk>`.
 
 ## Results
 
@@ -122,7 +128,7 @@ None of the failures is in the library. The list CI checks against is
 | Test | Count | Cause |
 | --- | --- | --- |
 | `ShadowSQLiteConnectionTest` (12 tests), `SQLiteLibraryLoaderTest.shouldExtractNativeLibrary` | 13 | These force `SQLiteMode.LEGACY`, which uses sqlite4java. sqlite4java has no linux-aarch64 native library: `Architecture 'aarch64' is not supported by SQLite library`. |
-| `ShadowViewThreadTest.testNewestSdk` | 1 | Runs at SDK 37, for which there is no arm64 library, so the stock loader refuses: `The Robolectric native runtime is not supported on Linux (aarch64)`. |
+| `ShadowViewThreadTest.testNewestSdk` | 1 | Runs at SDK 37 whatever `SDKS` says. With a library file there is no library for that level, so the loader refuses. It passes with the published artifacts, where the SDK 37 jar is on the classpath, and stays on the list because CI's per-SDK job uses a file. |
 | `ShadowNativeTableMaskFilterTest.initializationError` | 1 | `NoClassDefFoundError: android/graphics/TableMaskFilter`. The class is hidden; upstream has `android-all` on the test runtime classpath and this harness only has it at compile time. Fails the same way on x86_64 with the official library. |
 
 ## Findings from these suites
@@ -134,8 +140,9 @@ The suites found two loader bugs and one library bug, all fixed:
   copies the file into each sandbox's temporary directory, as the stock loader does.
 * The loader sent every SDK from 35 up to the arm64 library. Loading the SDK 36 library into an
   SDK 37 sandbox aborts the JVM in `JNI_OnLoad` (`RegisterNatives failed for
-  android/graphics/HardwareRenderer`). Only the SDK in `robolectric.arm64.nativeLibrarySdk`
-  (default 36) now uses it; other SDKs go to the stock loader, which fails cleanly.
+  android/graphics/HardwareRenderer`). Now each SDK has its own library, and a file named with
+  `robolectric.arm64.nativeLibrary` is used only at the SDK in `robolectric.arm64.nativeLibrarySdk`
+  (default 36).
 * `Bitmap.copy(Config.HARDWARE, false)`, `Bitmap.createBitmap(Picture)` and HARDWARE decodes
   returned transparent bitmaps, because the host branch of `Bitmap::allocateHardwareBitmap` in
   hwui allocated a heap bitmap without copying the pixels. The official library has the fix,

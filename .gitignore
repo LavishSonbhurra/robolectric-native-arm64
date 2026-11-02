@@ -15,12 +15,12 @@
 /toolchain/build/
 __pycache__/
 
-# Gradle (root project, loader/, compat/, tests/rig/, tests/upstream/harness/)
+# Gradle (root project, loader/, libraries/, tests/rig/, tests/upstream/harness/)
 .gradle/
 .kotlin/
 local.properties
 /loader/build/
-/compat/build/
+/libraries/*/build/
 /tests/**/build/
 .work/
 

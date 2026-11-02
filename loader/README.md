@@ -1,38 +1,32 @@
 # Loader plugin
 
 `robolectricarm64.LinuxArm64NativeRuntimeLoader` is a Robolectric `NativeRuntimeLoader` plugin
-that makes Robolectric 4.17 load a Linux arm64 `libandroid_runtime.so` for SDK 36, without
-forking or patching Robolectric. This project builds the published jar:
+that makes Robolectric 4.17 load Linux arm64 native runtime libraries, without forking or patching
+Robolectric. This project builds the published jar, which holds no library:
 
 | Entry | What |
 | --- | --- |
-| `robolectricarm64/LinuxArm64NativeRuntimeLoader.class` | The plugin, compiled for Java 17 against Robolectric 4.17. |
+| `robolectricarm64/LinuxArm64NativeRuntimeLoader.class` | The plugin, compiled for Java 11, the level of Robolectric's own jars, against Robolectric 4.17. |
 | `META-INF/services/org.robolectric.pluginapi.NativeRuntimeLoader` | Lets Robolectric's plugin lookup find it. |
-| `native/linux/aarch64/libandroid_runtime.so` | The library, if one was given at build time. |
-| `META-INF/THIRD_PARTY_NOTICES` | The notices file of the library build. |
-| `META-INF/LICENSE`, `META-INF/LICENSE-robolectric.txt` | Apache-2.0 (this project) and the MIT License of the Robolectric code the loader follows. |
+| `META-INF/LICENSE`, `META-INF/LICENSE-robolectric.txt`, `META-INF/NOTICE` | Apache-2.0 (this project) and the MIT License of the Robolectric code the loader follows. |
 
-Maven coordinates: `io.github.lavishsonbhurra:robolectric-nativeruntime-linux-aarch64:4.17-16-robolectric-13921718-1`
-(Robolectric version, android-all build, revision).
+Maven coordinates: `io.github.lavishsonbhurra:robolectric-nativeruntime-linux-aarch64:4.17-1`
+(Robolectric version, revision). Its POM depends on the library artifacts for SDK 35, 36, 37 and
+compat, from `libraries/`, so this one dependency covers SDK 26 to 37
+([docs/DISTRIBUTION.md](../docs/DISTRIBUTION.md)).
 
 ## Building
 
-From the repository root, after building the library (`build/out/lib/libandroid_runtime.so`,
-with `NOTICE` next to it):
+From the repository root:
 
 ```
-./gradlew :loader:jar -Pra64.nativeLib=$PWD/build/out/lib/libandroid_runtime.so
-# loader/build/libs/robolectric-nativeruntime-linux-aarch64-4.17-16-robolectric-13921718-1.jar
+./gradlew :loader:jar
+# loader/build/libs/robolectric-nativeruntime-linux-aarch64-4.17-1.jar
 ```
 
-| Setting (Gradle property or environment variable) | Meaning |
-| --- | --- |
-| `ra64.nativeLib`, `RA64_NATIVE_LIB` | The library to bundle. It is checked to be a 64-bit little-endian aarch64 ELF file. Without it the jar contains only the plugin. |
-| `ra64.nativeNotice`, `RA64_NATIVE_NOTICE` | The notices file to bundle (default: `NOTICE` next to the library, else `THIRD_PARTY_NOTICES` next to it). Required when a library is given. |
-
-`:loader:sourcesJar` and `:loader:javadocJar` build the companion jars Maven Central needs, and
-`:loader:publishToMavenLocal` installs all three with the POM. Publishing tasks refuse to run
-without a library. Signing and the upload to Central are not part of this build.
+`:loader:sourcesJar` and `:loader:javadocJar` build the companion jars Maven Central needs.
+`publishAllPublicationsToStagingRepository` writes all artifacts to `build/central-staging`; see
+[docs/BUILDING.md](../docs/BUILDING.md). Signing and the upload to Central are not part of this build.
 
 ## How Robolectric 4.17 finds libandroid_runtime
 
@@ -104,19 +98,23 @@ is listed in `META-INF/services/org.robolectric.pluginapi.NativeRuntimeLoader`. 
 jar on `testRuntimeOnly` is enough for Robolectric's own plugin lookup to pick it over the
 stock loader. Its `ensureLoaded()`:
 
-* hands over to the stock `super.ensureLoaded()` for SDK below 35, for any SDK other than
-  the one the library was built for (`-Drobolectric.arm64.nativeLibrarySdk`, default 36:
-  loading the SDK 36 library into an SDK 37 sandbox aborts the JVM in `JNI_OnLoad`, while the
-  stock loader fails cleanly), and on every platform other than Linux aarch64 unless forced,
-  so one test classpath works on every machine;
-* otherwise loads the file named by `-Drobolectric.arm64.nativeLibrary=/abs/path.so`, or the
-  classpath resource `native/linux/aarch64/libandroid_runtime.so`, always as a fresh copy in
-  the sandbox's temp directory, as the stock loader does (the JVM refuses to load one file
-  into a second sandbox class loader: "already loaded in another classloader"), and fails
-  with a message naming both options if neither exists. The resource is looked up on the
-  sandbox loader first (android-all, should it ever ship the file) and then up its parent
-  chain, which is how it gets past the sandbox's android-all-only rule for `*android_runtime*`
-  names;
+* loads the file named by `-Drobolectric.arm64.nativeLibrary=/abs/path.so` if it fits the SDK under
+  test, on any platform. `-Drobolectric.arm64.nativeLibrarySdk` names the SDK it was built for
+  (default 36; below 35 means the compat library, which fits every level below 35). At any other SDK
+  the file is ignored, with a line on stderr: a libandroid_runtime only matches its own android-all,
+  and loading the SDK 36 library into an SDK 37 sandbox aborts the JVM in `JNI_OnLoad`;
+* otherwise, on Linux aarch64, loads the library for the SDK under test from the classpath:
+  `native/linux/aarch64/sdk<NN>/libandroid_runtime.so` at SDK 35 and above, the compat library below
+  35. One path per SDK is what makes the wrong library unreachable. The lookup walks up from the
+  sandbox loader to its parents, which is how it gets past the sandbox's android-all-only rule for
+  `*android_runtime*` names;
+* fails with a message naming the artifact if the library for SDK 37 or below is missing, instead
+  of the stock loader's `not supported on Linux (aarch64)`;
+* hands over to the stock `super.ensureLoaded()` on every other platform, and for SDK levels above
+  37, so one test classpath works on every machine;
+* always loads a fresh copy in the sandbox's temp directory, as the stock loader does (the JVM
+  refuses to load one file into a second sandbox class loader: "already loaded in another
+  classloader");
 * does every other step exactly as upstream by calling the stock loader's private
   `maybeCopyFonts`, `maybeCopyHyphenData`, `maybeCopyIcuData` reflectively and its protected
   `getCoreClassNatives()`, `getGraphicsNatives()`, `invokeDeferredStaticInitializers()` and

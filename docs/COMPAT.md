@@ -108,19 +108,20 @@ same image our arm64 library produces, and our x86_64 build passes it with glibc
 
 ## Using it
 
-The loader plugin (`:loader`, artifact `robolectric-nativeruntime-linux-aarch64`, version
-`4.17-16-robolectric-13921718-2` or later) handles both libraries. For SDK levels below 35 on
-Linux aarch64 it loads the compat library from the test classpath. Two artifacts provide it, both
-version `1.0.19-2` and without code:
+The loader plugin (`:loader`, artifact `robolectric-nativeruntime-linux-aarch64`, version `4.17-1`)
+handles both kinds of library. For SDK levels below 35 on Linux aarch64 it loads the compat library
+from the test classpath, and its POM depends on the native build below, so nothing needs adding. Two
+artifacts provide the library, both version `1.0.19-2` and without code. Their jars did not change
+with the move to `libraries/build.gradle.kts`: rebuilt, they are byte-identical to the `v4.17-16-robolectric-13921718-3` assets.
 
 | Artifact (`:project`) | Resource | Pixels |
 | --- | --- | --- |
 | `robolectric-nativeruntime-compat-linux-aarch64` (`:compat`) | `native/linux/aarch64/librobolectric-nativeruntime.so` | native NEON (default) |
 | `robolectric-nativeruntime-compat-linux-aarch64-x86pixels` (`:compat-x86pixels`) | `native/linux/aarch64/x86-pixels/librobolectric-nativeruntime.so` | x86 |
 
-Add one of them. If both are on the classpath the loader takes the native one, unless
-`-Drobolectric.arm64.compatPixels=x86`; naming a build that is not on the classpath fails with a
-clear message. The native build uses the path `nativeruntime-dist-compat` uses for x86_64, so
+For x86 pixels, add the second one and set `-Drobolectric.arm64.compatPixels=x86`: with both on the
+classpath the loader takes the native one otherwise. Naming a build that is not on the classpath
+fails with a clear message. The native build uses the path `nativeruntime-dist-compat` uses for x86_64, so
 Robolectric's stock loader would find it too once it accepts Linux aarch64; the x86-pixels build
 has its own path so that the two jars never shadow each other and the stock loader never picks it
 up by accident. Separate artifacts rather than a classifier: each has its own POM, notices and

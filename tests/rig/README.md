@@ -1,14 +1,14 @@
-# Fidelity rig (SDK 36, native graphics)
+# Fidelity rig (native graphics)
 
 A small Android Gradle project that renders a fixed set of scenes with Robolectric 4.17
-native graphics (`@Config(sdk = [36])`, `GraphicsMode.NATIVE`,
-`robolectric.pixelCopyRenderMode=hardware`) and writes them to PNG. Two runs can then be
-pixel-diffed. It checks the source-built Linux arm64 `libandroid_runtime.so` against the
-official x86_64 one that Robolectric ships inside android-all.
+native graphics (`GraphicsMode.NATIVE`, `robolectric.pixelCopyRenderMode=hardware`) at one SDK
+level (`RIG_SDK`, default 36) and writes them to PNG. Two runs can then be pixel-diffed. It
+checks the source-built Linux arm64 libraries against the official x86_64 ones.
 
 The loader plugin the rig puts on the test classpath is the repository's own
 [`loader/`](../../loader) project; `settings.gradle.kts` includes it, so a rig run always tests
-the current loader sources (or, with `RIG_LOADER_JAR`, a prebuilt jar).
+the current loader sources. With `RIG_ARTIFACT_REPO` it depends on the published loader artifact
+instead, which is the path a user gets.
 
 ## Layout
 
@@ -18,8 +18,9 @@ the current loader sources (or, with `RIG_LOADER_JAR`, a prebuilt jar).
 | `app/src/test/resources/images/` | Decoder inputs (PNG RGBA/palette/gray, JPEG baseline/progressive, WebP lossy/lossless), made by `scripts/make-assets.py`. |
 | `scripts/run.sh` | Runs the rig in one mode and writes `out/<mode>/`. |
 | `scripts/compare.py` | Pixel diff of two output directories. |
-| `goldens/x86_64/` | Reference output (37 PNG, 3 text files) from the official x86_64 library, mode `golden-x86`. |
-| `baseline/arm64.json` | Per-image ceilings (largest channel delta, number of differing pixels) for the arm64 build against the goldens. Checked by `ci/check-baseline.py`. |
+| `scripts/check-artifacts.sh` | Judges a `RIG_ARTIFACT_REPO` run: test count from the XML, which jar the library came from, baseline. |
+| `goldens/x86_64/`, `goldens/x86_64-sdk<N>/` | Reference output (37 PNG, 3 text files) from the official x86_64 library, mode `golden-x86`: SDK 36, and SDK 30, 34, 35, 37. |
+| `baseline/arm64.json`, `baseline/arm64-sdk<N>.json`, `baseline/arm64-compat-*.json` | Per-image ceilings (largest channel delta, number of differing pixels) for the arm64 build against the goldens. Checked by `ci/check-baseline.py`. |
 
 ## Scenes
 
@@ -83,7 +84,7 @@ scripts/run.sh <mode> [extra Gradle arguments]
 | --- | --- | --- |
 | `golden-x86` | x86_64 JDK 21 under qemu-user | stock `DefaultNativeRuntimeLoader`, official x86_64 library from android-all. Produces the goldens. |
 | `x86-via-loader` | same | `LinuxArm64NativeRuntimeLoader`, forced to load the official x86_64 library from a file (or `RIG_X86_LIB`). Shows that the plugin renders exactly like the stock loader. |
-| `arm64` | native aarch64 JDK 21 | `LinuxArm64NativeRuntimeLoader` with the arm64 library from `RIG_ARM64_LIB`, `RIG_LOADER_JAR` or `RA64_NATIVE_LIB`. |
+| `arm64` | native aarch64 JDK 21 | `LinuxArm64NativeRuntimeLoader` with the arm64 library from `RIG_ARM64_LIB` and `RIG_LOADER_JAR`, or from the published artifacts with `RIG_ARTIFACT_REPO`. |
 
 Output goes to `out/<mode>/` (or `out/$RIG_OUT_NAME/`). Extra arguments go to Gradle, for
 example `--tests 'rig.fidelity.TextScenesTest'`. The exit status is Gradle's.
@@ -94,13 +95,13 @@ Environment variables, all optional:
 | --- | --- |
 | `RIG_ARM64_JDK`, `RIG_X64_JDK` | Java 21 homes for the test JVM (default `.work/jdk/aarch64`, `.work/jdk/x64`). |
 | `RIG_ARM64_LIB` | `arm64`: load this `libandroid_runtime.so` through `-Drobolectric.arm64.nativeLibrary`. |
-| `RIG_LOADER_JAR` | `arm64`: put this prebuilt loader jar on the test classpath instead of the `:loader` project. Use it to test the release jar, library bundled. |
-| `RIG_COMPAT_JAR` | `arm64`: also put these compat jars (comma-separated) on the test classpath, for SDK 34 and below. Use it with `RIG_LOADER_JAR` and without `RIG_ARM64_LIB` to test the release jars. |
+| `RIG_ARTIFACT_REPO`, `RIG_ARTIFACT_VERSION` | `arm64`: depend on `robolectric-nativeruntime-linux-aarch64` at this version, from this Maven repository (`build/central-staging` of the root build), and get the libraries through its POM. Leave `RIG_ARM64_LIB` unset. |
+| `RIG_LOADER_JAR` | `arm64`: put this prebuilt loader jar on the test classpath instead of the `:loader` project. |
+| `RIG_COMPAT_JAR` | `arm64`: also put these jars (comma-separated) on the test classpath, for example one library jar without the others. |
 | `RIG_COMPAT_PIXELS` | `arm64`: `native` or `x86`, which compat jar the loader takes when both are on the classpath. |
-| `RA64_NATIVE_LIB` | Read by the `:loader` project: bundle this library into its jar for the run, so it is loaded as a classpath resource. |
 | `RIG_X86_LIB` | `x86-via-loader`: the x86_64 library to load (default: the official one, unpacked from android-all into `.work/x86lib/`). |
 | `RIG_M2_REPO` | The local Maven repository Robolectric downloads android-all into (default `$HOME/.m2/repository`). |
-| `RIG_SDK` | SDK level to run (default 36). Below 35 the SDK <= 34 compat library is used, and the goldens are `goldens/x86_64-sdk<N>`. |
+| `RIG_SDK` | SDK level to run (default 36). Below 35 the SDK <= 34 compat library is used. The goldens are `goldens/x86_64-sdk<N>`. At 37 the run uses Espresso 3.8.0-alpha03, because 3.7.0 calls a method SDK 37 removed. |
 | `RIG_OUT_NAME` | Output directory name under `out/` (default: the mode). |
 | `GRADLE` | Gradle command (default `../../gradlew`). |
 | `GRADLE_JAVA_HOME` | JDK that runs Gradle itself (default: `JAVA_HOME` as set). |
@@ -112,10 +113,11 @@ Environment variables, all optional:
 Examples:
 
 ```
-# The release jar, library inside (the path a user gets):
-./gradlew :loader:jar -Pra64.nativeLib=$PWD/build/out/lib/libandroid_runtime.so     # repository root
-RIG_LOADER_JAR=../../loader/build/libs/robolectric-nativeruntime-linux-aarch64-4.17-16-robolectric-13921718-1.jar \
-  scripts/run.sh arm64
+# The published artifacts, one dependency line, as a user gets them. Build the repository first
+# (docs/BUILDING.md, "The jars"), then:
+RIG_SDK=35 RIG_ARTIFACT_REPO=../../build/central-staging RIG_ARTIFACT_VERSION=4.17-1 \
+  RIG_OUT_NAME=artifacts-sdk35 scripts/run.sh arm64
+scripts/check-artifacts.sh 35 $PWD/out/artifacts-sdk35
 
 # A library file, loaded through the system property:
 RIG_ARM64_LIB=/abs/path/libandroid_runtime.so scripts/run.sh arm64
@@ -126,8 +128,8 @@ python3 -I ../../ci/check-baseline.py out/arm64/_report.json --baseline baseline
 ```
 
 `out/arm64/_loader.txt` must name `robolectricarm64.LinuxArm64NativeRuntimeLoader` and say
-where the library came from (`classpath resource via ...` for a bundled library, the file path
-for `RIG_ARM64_LIB`).
+where the library came from (`classpath resource jar:file:...` for a library from a jar, the
+file path for `RIG_ARM64_LIB`).
 
 Gradle runs with `--no-daemon`; `gradle.properties` sets one worker and modest heaps, so the
 rig fits a 2 vCPU machine. The test JVM heap is `-Prig.heap` (default 1280m). The test JVM
@@ -156,7 +158,7 @@ Measured on a 2 vCPU arm64 VM (Ampere), Temurin 21.
 | `x86-via-loader` with `RIG_X86_LIB` = this repository's x86_64 build | 37/37 PNGs and 3/3 text files identical to the goldens, max delta 0 | 572 s |
 | `arm64` (this repository's arm64 build) | 28/37 PNGs and 3/3 text files identical; the other nine within `baseline/arm64.json` | about 40 s after the first build |
 | `arm64` with the stock loader (`-Prig.stock`) | `AssertionError: The Robolectric native runtime is not supported on Linux (aarch64)` | 44 s |
-| `arm64` without a library | `AssertionError: No Linux arm64 Robolectric native runtime found. Put native/linux/aarch64/libandroid_runtime.so on the test runtime classpath, or set -Drobolectric.arm64.nativeLibrary=...` | 46 s |
+| `arm64` without a library | `AssertionError: No Linux arm64 Robolectric native runtime for SDK 36 on the test classpath. Add io.github.lavishsonbhurra:robolectric-nativeruntime-sdk36-linux-aarch64 ...` | 46 s |
 
 Under qemu the first test of each test class's sandbox costs 110 to 150 s (sandbox
 creation, loading android-all, `JNI_OnLoad`); later tests take 1 to 10 s each. The goldens

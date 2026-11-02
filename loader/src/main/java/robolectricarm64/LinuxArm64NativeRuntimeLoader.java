@@ -55,11 +55,11 @@ import org.robolectric.util.TempDirectory;
  * <p>Where it does something different from the stock loader:
  *
  * <ul>
- *   <li>If the system property {@value #LIBRARY_PROPERTY} names a file, that file is loaded, on
- *       any OS and architecture. This is how the rig checks this code path with the official
- *       x86_64 library.
- *   <li>Otherwise, on Linux aarch64, the classpath resource {@value #ARM64_RESOURCE} is used
- *       (from android-all itself once upstream ships it, or from any jar on the test classpath).
+ *   <li>If the system property {@value #LIBRARY_PROPERTY} names a file built for the SDK under
+ *       test ({@value #LIBRARY_SDK_PROPERTY}), that file is loaded, on any OS and architecture.
+ *       This is how the rig checks this code path with the official x86_64 library.
+ *   <li>Otherwise, for SDK 35 and above on Linux aarch64, the library for that SDK level from
+ *       the test classpath, at {@code native/linux/aarch64/sdk<NN>/libandroid_runtime.so}.
  *   <li>For SDK levels below 35 on Linux aarch64, the compat library from the classpath:
  *       {@value #ARM64_COMPAT_RESOURCE} (the default, native arm64 pixels) or
  *       {@value #ARM64_COMPAT_X86_RESOURCE} (the x86-pixels build). With both on the classpath
@@ -81,10 +81,18 @@ public class LinuxArm64NativeRuntimeLoader extends DefaultNativeRuntimeLoader {
   /** Set after loading: where the library came from (for logs and the rig's manifest). */
   public static final String LOADED_FROM_PROPERTY = "robolectric.arm64.loadedFrom";
 
-  /** The SDK level the library was built for (default 36); other SDKs use the stock loader. */
+  /**
+   * The SDK level the file in {@value #LIBRARY_PROPERTY} was built for (default 36). Below 35
+   * means the compat library. For any other SDK the file is ignored.
+   */
   public static final String LIBRARY_SDK_PROPERTY = "robolectric.arm64.nativeLibrarySdk";
 
-  public static final String ARM64_RESOURCE = "native/linux/aarch64/libandroid_runtime.so";
+  /**
+   * Where each SDK's libandroid_runtime sits on the classpath, by SDK level. One path per SDK, so
+   * the library jars can share a classpath and no SDK can pick up another SDK's library.
+   */
+  public static final String ARM64_SDK_RESOURCE_FORMAT =
+      "native/linux/aarch64/sdk%d/libandroid_runtime.so";
 
   /** The library for SDK 34 and older (nativeruntime-dist-compat's layout), for SDK levels below 35. */
   public static final String ARM64_COMPAT_RESOURCE =
@@ -105,44 +113,91 @@ public class LinuxArm64NativeRuntimeLoader extends DefaultNativeRuntimeLoader {
 
   private static final int VANILLA_ICE_CREAM = 35;
 
+  /** The newest SDK with a library artifact. Later ones are left to the stock loader. */
+  private static final int NEWEST_LIBRARY_SDK = 37;
+
   @Override
   public synchronized void ensureLoaded() {
     if (loaded.get()) {
       return;
     }
-    String override = System.getProperty(LIBRARY_PROPERTY, "").trim();
-    boolean linuxArm64 = isLinux() && "aarch64".equals(arch());
-    // A libandroid_runtime only matches the android-all it was built from: loading the SDK 36
-    // library into another SDK's sandbox aborts the JVM in JNI_OnLoad (RegisterNatives fails
-    // on changed signatures). Other SDKs go to the stock loader, which fails cleanly.
-    int librarySdk = Integer.parseInt(System.getProperty(LIBRARY_SDK_PROPERTY, "36").trim());
-    // SDK <= 34 use one library for every SDK level (librobolectric-nativeruntime, from
-    // android12-hostruntime-dev): it registers its natives on Robolectric's own *Natives
-    // classes, so any SDK below 35 can load it. Used when the override names such a library
-    // (LIBRARY_SDK_PROPERTY below 35) or, on Linux arm64 with no override, from the classpath.
-    if (sdkInt() < VANILLA_ICE_CREAM
-        && ((!override.isEmpty() && librarySdk < VANILLA_ICE_CREAM)
-            || (override.isEmpty() && linuxArm64 && compatResource() != null))) {
-      loaded.set(true);
-      PerfStatsCollector.getInstance()
-          .measure("loadNativeRuntime", () -> loadCompat(override));
-      return;
-    }
-    if (sdkInt() < VANILLA_ICE_CREAM
-        || sdkInt() != librarySdk
-        || (override.isEmpty() && !linuxArm64)) {
-      super.ensureLoaded();
-      if (System.getProperty(LOADED_FROM_PROPERTY) == null) {
-        System.setProperty(LOADED_FROM_PROPERTY, "upstream DefaultNativeRuntimeLoader");
+    int sdk = sdkInt();
+    String override = overrideFor(sdk);
+    if (override.isEmpty()) {
+      boolean linuxArm64 = isLinux() && "aarch64".equals(arch());
+      boolean found =
+          linuxArm64 && (sdk < VANILLA_ICE_CREAM ? compatResource() != null : sdkResource(sdk) != null);
+      if (!found) {
+        if (linuxArm64 && sdk <= NEWEST_LIBRARY_SDK) {
+          throw new AssertionError(missingLibraryMessage(sdk));
+        }
+        super.ensureLoaded();
+        if (System.getProperty(LOADED_FROM_PROPERTY) == null) {
+          System.setProperty(LOADED_FROM_PROPERTY, "upstream DefaultNativeRuntimeLoader");
+        }
+        return;
       }
-      return;
     }
     loaded.set(true);
     PerfStatsCollector.getInstance()
-        .measure("loadNativeRuntime", () -> loadCustom(override));
+        .measure(
+            "loadNativeRuntime",
+            () -> {
+              if (sdk < VANILLA_ICE_CREAM) {
+                loadCompat(override);
+              } else {
+                loadCustom(override, sdk);
+              }
+            });
   }
 
-  private void loadCustom(String override) {
+  /**
+   * The override file if it fits the SDK under test, otherwise an empty string. A
+   * libandroid_runtime only matches the android-all it was built from: loading one into another
+   * SDK's sandbox aborts the JVM in JNI_OnLoad (RegisterNatives fails on changed signatures).
+   * SDK levels below 35 share one library (librobolectric-nativeruntime, from
+   * android12-hostruntime-dev): it registers its natives on Robolectric's own *Natives classes,
+   * so it fits all of them.
+   */
+  private static int librarySdk() {
+    String value = System.getProperty(LIBRARY_SDK_PROPERTY, "36").trim();
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException e) {
+      throw new AssertionError(
+          LIBRARY_SDK_PROPERTY + " must be an SDK level, not \"" + value + "\"");
+    }
+  }
+
+  private static String overrideFor(int sdk) {
+    String override = System.getProperty(LIBRARY_PROPERTY, "").trim();
+    if (override.isEmpty()) {
+      return "";
+    }
+    int librarySdk = librarySdk();
+    boolean fits =
+        sdk < VANILLA_ICE_CREAM ? librarySdk < VANILLA_ICE_CREAM : sdk == librarySdk;
+    if (fits) {
+      return override;
+    }
+    System.err.println(
+        LIBRARY_PROPERTY + " is ignored at SDK " + sdk + ": it was built for SDK " + librarySdk
+            + " (" + LIBRARY_SDK_PROPERTY + ")");
+    return "";
+  }
+
+  private static String missingLibraryMessage(int sdk) {
+    boolean compat = sdk < VANILLA_ICE_CREAM;
+    String artifact =
+        "robolectric-nativeruntime-" + (compat ? "compat" : "sdk" + sdk) + "-linux-aarch64";
+    return "No Linux arm64 Robolectric native runtime for SDK " + sdk + " on the test classpath. Add "
+        + "io.github.lavishsonbhurra:" + artifact + " (the dependency "
+        + "robolectric-nativeruntime-linux-aarch64 brings it in), or set -D" + LIBRARY_PROPERTY
+        + "=/path/to/" + (compat ? "librobolectric-nativeruntime.so" : "libandroid_runtime.so")
+        + " and -D" + LIBRARY_SDK_PROPERTY + "=" + (compat ? "34" : sdk);
+  }
+
+  private void loadCustom(String override, int sdk) {
     try {
       TempDirectory dir = new TempDirectory("nativeruntime");
       setExtractDirectory(dir);
@@ -151,7 +206,12 @@ public class LinuxArm64NativeRuntimeLoader extends DefaultNativeRuntimeLoader {
       callPrivate("maybeCopyIcuData", dir);
       maybeCopyExtraResources(dir);
 
-      Path library = resolveLibrary(override, dir);
+      // A fresh copy every time, as the stock loader does: every sandbox class loader needs its
+      // own instance of the library, and the JVM refuses to load one file into a second class
+      // loader ("already loaded in another classloader").
+      URL resource = override.isEmpty() ? sdkResource(sdk) : null;
+      Path library = dir.getBasePath().resolve("libandroid_runtime.so");
+      copyLibrary(override, resource, library);
       Map<String, String> saved = new HashMap<>();
       for (String key : JNI_PROPERTIES) {
         saved.put(key, System.getProperty(key));
@@ -173,7 +233,8 @@ public class LinuxArm64NativeRuntimeLoader extends DefaultNativeRuntimeLoader {
       }
       System.setProperty(
           LOADED_FROM_PROPERTY,
-          (override.isEmpty() ? "classpath resource" : override) + " via " + library.toAbsolutePath());
+          (override.isEmpty() ? "classpath resource " + resource : override)
+              + " via " + library.toAbsolutePath());
 
       invokeDeferredStaticInitializers();
       setNativeSystemProperty(
@@ -205,21 +266,12 @@ public class LinuxArm64NativeRuntimeLoader extends DefaultNativeRuntimeLoader {
       callPrivate("maybeCopyIcuData", dir);
       maybeCopyExtraResources(dir);
       Path target = dir.getBasePath().resolve("librobolectric-nativeruntime.so");
-      if (!override.isEmpty()) {
-        Path path = Paths.get(override);
-        if (!Files.isRegularFile(path)) {
-          throw new AssertionError(LIBRARY_PROPERTY + " points at a missing file: " + path);
-        }
-        Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
-      } else {
-        try (InputStream in = compatResource().url.openStream()) {
-          Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
-        }
-      }
+      URL resource = override.isEmpty() ? compatResource().url : null;
+      copyLibrary(override, resource, target);
       System.load(target.toAbsolutePath().toString());
       System.setProperty(
           LOADED_FROM_PROPERTY,
-          (override.isEmpty() ? "classpath resource " + compatResource().name : override)
+          (override.isEmpty() ? "classpath resource " + resource : override)
               + " via " + target.toAbsolutePath());
       System.setProperty(
           "hyphen.data.dir",
@@ -287,47 +339,37 @@ public class LinuxArm64NativeRuntimeLoader extends DefaultNativeRuntimeLoader {
     "method_binding_format",
   };
 
-  /**
-   * The override file or the classpath resource, copied into the extract directory. Always a
-   * fresh copy, as the stock loader does: every sandbox class loader needs its own instance of
-   * the library, and the JVM refuses to load one file into a second class loader
-   * ("already loaded in another classloader").
-   */
-  private static Path resolveLibrary(String override, TempDirectory dir) throws IOException {
-    Path target = dir.getBasePath().resolve("libandroid_runtime.so");
+  private static void copyLibrary(String override, URL resource, Path target) throws IOException {
     if (!override.isEmpty()) {
       Path path = Paths.get(override);
       if (!Files.isRegularFile(path)) {
         throw new AssertionError(LIBRARY_PROPERTY + " points at a missing file: " + path);
       }
       Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
-      return target;
+      return;
     }
-    // The sandbox loader serves any resource whose name contains "android_runtime" from
-    // android-all only (InstrumentationConfiguration.shouldAcquireResource), so a jar on the
-    // test classpath is invisible through it. Ask it first (android-all may ship the file one
-    // day), then walk up to the ordinary application class loader.
-    URL url = null;
-    for (ClassLoader cl = LinuxArm64NativeRuntimeLoader.class.getClassLoader();
-        cl != null && url == null;
-        cl = cl.getParent()) {
-      url = cl.getResource(ARM64_RESOURCE);
-    }
-    if (url == null) {
-      url = ClassLoader.getSystemResource(ARM64_RESOURCE);
-    }
-    if (url == null) {
-      throw new AssertionError(
-          "No Linux arm64 Robolectric native runtime found. Put "
-              + ARM64_RESOURCE
-              + " on the test runtime classpath, or set -D"
-              + LIBRARY_PROPERTY
-              + "=/path/to/libandroid_runtime.so");
-    }
-    try (InputStream in = url.openStream()) {
+    try (InputStream in = resource.openStream()) {
       Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
     }
-    return target;
+  }
+
+  /**
+   * The library for this SDK level on the test classpath, or null. The sandbox loader serves any
+   * resource whose name contains "android_runtime" from android-all only
+   * (InstrumentationConfiguration.shouldAcquireResource), so a jar on the test classpath is
+   * invisible through it: walk up to the ordinary application class loader.
+   */
+  private static URL sdkResource(int sdk) {
+    String name = String.format(Locale.ROOT, ARM64_SDK_RESOURCE_FORMAT, sdk);
+    for (ClassLoader cl = LinuxArm64NativeRuntimeLoader.class.getClassLoader();
+        cl != null;
+        cl = cl.getParent()) {
+      URL url = cl.getResource(name);
+      if (url != null) {
+        return url;
+      }
+    }
+    return ClassLoader.getSystemResource(name);
   }
 
   private void callPrivate(String name, TempDirectory dir) throws IOException {

@@ -1,0 +1,14 @@
+The native library in this artifact is built from AOSP source, not from code in this jar.
+
+Source: AOSP tag android-17.0.0_r1, at the revisions in config/sdk37/sources.lock.json of the repository
+below, with the patches in config/sdk37/patches/.
+
+Build scripts, patches and the pinned source list:
+https://github.com/LavishSonbhurra/robolectric-native-arm64
+
+docs/BUILDING.md in that repository explains how to rebuild the library. The GitHub release for
+this version holds the bare library, its notices and its checksums.
+
+The library includes Eigen under the Mozilla Public License 2.0, compiled in unmodified through
+TensorFlow Lite. Its source is external/eigen at the same tag:
+https://android.googlesource.com/platform/external/eigen

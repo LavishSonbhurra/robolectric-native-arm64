@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The root build holds the published jars: :loader (plugin + SDK 36 library), :compat (the
-// SDK <= 34 library, native arm64 pixels) and :compat-x86pixels (the same library built with
-// RA64_PIXELS=x86). Both compat projects use compat/build.gradle.kts. The fidelity rig in tests/rig is a
-// separate Android build that includes the same loader project: ./gradlew -p tests/rig ...
+// The root build holds the published jars: :loader (the plugin, no library), :sdk35, :sdk36 and
+// :sdk37 (libandroid_runtime.so per SDK), :compat (the SDK <= 34 library, native arm64 pixels) and
+// :compat-x86pixels (the same library built with RA64_PIXELS=x86). The five library projects share
+// libraries/build.gradle.kts. The fidelity rig in tests/rig is a separate Android build that
+// includes the same loader project: ./gradlew -p tests/rig ...
 
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
@@ -14,7 +15,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "robolectric-native-arm64"
 include(":loader")
-include(":compat")
-include(":compat-x86pixels")
-project(":compat-x86pixels").projectDir = file("compat/x86pixels")
-project(":compat-x86pixels").buildFileName = "../build.gradle.kts"
+listOf("sdk35", "sdk36", "sdk37", "compat", "compat-x86pixels").forEach { name ->
+    include(":$name")
+    project(":$name").projectDir = file("libraries/$name")
+    project(":$name").buildFileName = "../build.gradle.kts"
+}

@@ -1,7 +1,7 @@
 # Builds librobolectric-nativeruntime.so (the SDK <= 34 library from
 # AOSP android12-hostruntime-dev, the one in org.robolectric:nativeruntime-dist-compat) for
 # Linux arm64, checks it, runs the fidelity rig at SDK 30 and 34, packages it and attests the
-# result. Next to build.yml (SDK 36); same action pins. This workflow has not run on GitHub yet:
+# result. Next to build.yml (SDK 35 to 37); same action pins. This workflow has not run on GitHub yet:
 # its commands are the ones used locally (docs/COMPAT.md), so expect fixes on the first run.
 #
 # Jobs
@@ -249,23 +249,24 @@ jobs:
       # path nativeruntime-dist-compat uses for x86_64; the x86-pixels build as
       # native/linux/aarch64/x86-pixels/librobolectric-nativeruntime.so in its own artifact.
       # Fonts, ICU data and hyphenation data come from the official jar, which Robolectric
-      # already depends on. The jars hold no code; the loader plugin from the SDK 36 artifact
+      # already depends on. The jars hold no code; the loader plugin
       # (robolectric-nativeruntime-linux-aarch64) loads them.
       - name: Build the compat jars with the libraries inside
         run: |
-          ./gradlew --no-daemon :compat:jar :compat-x86pixels:jar \
+          ./gradlew --no-daemon :compat:jar :compat:sourcesJar :compat:javadocJar \
+            :compat-x86pixels:jar :compat-x86pixels:sourcesJar :compat-x86pixels:javadocJar \
             -Pra64.compatLib="$PWD/dist-compat/librobolectric-nativeruntime.so" \
             -Pra64.compatNotice="$PWD/dist-compat/THIRD_PARTY_NOTICES" \
             -Pra64.compatX86Lib="$PWD/dist-compat-x86/librobolectric-nativeruntime.so" \
             -Pra64.compatX86Notice="$PWD/dist-compat-x86/THIRD_PARTY_NOTICES"
-          unzip -l compat/build/libs/robolectric-nativeruntime-compat-linux-aarch64-*[0-9].jar \
+          unzip -l libraries/compat/build/libs/robolectric-nativeruntime-compat-linux-aarch64-*[0-9].jar \
             | grep -q ' native/linux/aarch64/librobolectric-nativeruntime.so$'
-          unzip -l compat/x86pixels/build/libs/*-x86pixels-*[0-9].jar \
+          unzip -l libraries/compat-x86pixels/build/libs/*-x86pixels-*[0-9].jar \
             | grep -q ' native/linux/aarch64/x86-pixels/librobolectric-nativeruntime.so$'
           # Same GitHub release as build.yml's assets, so every name differs from those: the
           # libraries have their own names, the rest is prefixed compat- / compat-x86pixels-.
           mkdir -p release-compat
-          cp compat/build/libs/*.jar compat/x86pixels/build/libs/*.jar release-compat/
+          cp libraries/compat/build/libs/*.jar libraries/compat-x86pixels/build/libs/*.jar release-compat/
           cp dist-compat/librobolectric-nativeruntime.so release-compat/
           cp dist-compat-x86/librobolectric-nativeruntime.so release-compat/librobolectric-nativeruntime-x86pixels.so
           for f in THIRD_PARTY_NOTICES notices.json build-info.txt; do

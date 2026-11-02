@@ -1,7 +1,7 @@
 # robolectric-native-arm64
 
-Robolectric's native graphics runtime (`libandroid_runtime.so`) built from source for Linux arm64
-(aarch64, glibc), plus the Robolectric plugin that loads it.
+Robolectric's native graphics runtime built from source for Linux arm64 (aarch64, glibc), for SDK 26
+to 37, plus the Robolectric plugin that loads it.
 
 Robolectric 4.17 runs native graphics and native SQLite for SDK 35 and later through a
 `libandroid_runtime.so` that ships inside the `android-all` jar for linux/x86_64, mac/aarch64, mac/x86_64
@@ -19,49 +19,41 @@ Robolectric project. "Android" is a trademark of Google LLC.
 
 ## Status
 
-* Target: SDK 36, Robolectric 4.17, android-all `16-robolectric-13921718`, AOSP tag `android-16.0.0_r1`
-  plus four host fixes from later AOSP tags that the official library also contains
-  ([docs/rng-audit.md](docs/rng-audit.md)).
-* Platform: Linux arm64 with glibc 2.31 or newer (Debian 11, Ubuntu 20.04, RHEL 9, Amazon Linux 2023 and
-  later). Java 21 is required by SDK 36.
-* SDK 26 to 34: the compat artifact `robolectric-nativeruntime-compat-linux-aarch64` holds the other
-  native library Robolectric uses below SDK 35 (`librobolectric-nativeruntime.so`, the one in
-  `nativeruntime-dist-compat` 1.0.19), built from source the same way. A second build of it,
-  `robolectric-nativeruntime-compat-linux-aarch64-x86pixels`, renders exactly like the x86_64 library
-  under qemu. See [docs/COMPAT.md](docs/COMPAT.md). Not covered: SDK 37. SDK 35 is untested.
+One tree builds every library, and one dependency brings them all:
+
+| SDK | Library | Built from | Java | Artifact |
+| --- | --- | --- | --- | --- |
+| 26 to 34 | `librobolectric-nativeruntime.so` | `android12-hostruntime-dev`, the source of `nativeruntime-dist-compat` 1.0.19 | 17 | `robolectric-nativeruntime-compat-linux-aarch64` |
+| 35 | `libandroid_runtime.so` | `android-15.0.0_r1` plus 36 patches, for android-all `15-robolectric-13954326` | 17 | `robolectric-nativeruntime-sdk35-linux-aarch64` |
+| 36 | `libandroid_runtime.so` | `android-16.0.0_r1` plus four host fixes from later AOSP tags that the official library also contains ([docs/rng-audit.md](docs/rng-audit.md)), for android-all `16-robolectric-13921718` | 21 | `robolectric-nativeruntime-sdk36-linux-aarch64` |
+| 37 | `libandroid_runtime.so` | `android-17.0.0_r1` plus 3 patches, for android-all `17-robolectric-15733970` | 21 | `robolectric-nativeruntime-sdk37-linux-aarch64` |
+
+* Robolectric 4.17. Linux arm64 with glibc 2.31 or newer (Debian 11, Ubuntu 20.04, RHEL 9, Amazon Linux
+  2023 and later).
+* A second build of the SDK 26 to 34 library, `robolectric-nativeruntime-compat-linux-aarch64-x86pixels`,
+  renders exactly like the x86_64 library under qemu. See [docs/COMPAT.md](docs/COMPAT.md).
+* SDK 35 and 37 are newer than the other libraries and less verified: see
+  [How it was verified](#how-it-was-verified), and [docs/SDK35.md](docs/SDK35.md) and
+  [docs/SDK37.md](docs/SDK37.md) for what is not.
 * Released on GitHub:
   [v4.17-16-robolectric-13921718-3](https://github.com/LavishSonbhurra/robolectric-native-arm64/releases/tag/v4.17-16-robolectric-13921718-3)
-  (loader `-3` with the SDK 36 library, and the two compat jars `1.0.19-2`), built and attested by CI
-  on GitHub's arm64 runners. Publishing to Maven Central comes later.
+  (SDK 26 to 34 and 36, in the earlier layout), built and attested by CI on GitHub's arm64 runners. The
+  layout described here, with SDK 35 and 37, is not released yet and has not been through CI. Maven Central
+  comes with it.
 
 ## Quick start
 
-Coordinates:
-
-| | |
-| --- | --- |
-| Group | `io.github.lavishsonbhurra` |
-| Artifact | `robolectric-nativeruntime-linux-aarch64` |
-| Version | `4.17-16-robolectric-13921718-3` (Robolectric, android-all build, revision) |
-
-Until the artifact is on Maven Central, download the jar from the
-[GitHub releases](https://github.com/LavishSonbhurra/robolectric-native-arm64/releases) and use it as a
-file dependency.
+Once `4.17-1` is on Maven Central:
 
 ```kotlin
 dependencies {
     testImplementation("org.robolectric:robolectric:4.17")
-    // Inert on every platform except Linux aarch64.
-    testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-linux-aarch64:4.17-16-robolectric-13921718-3")
-    // For tests at SDK 26 to 34. For x86-identical pixels use
-    // robolectric-nativeruntime-compat-linux-aarch64-x86pixels instead.
-    testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-compat-linux-aarch64:1.0.19-2")
-    // Before Maven Central, use the release jars as files:
-    // testRuntimeOnly(files("libs/robolectric-nativeruntime-linux-aarch64-4.17-16-robolectric-13921718-3.jar"))
-    // testRuntimeOnly(files("libs/robolectric-nativeruntime-compat-linux-aarch64-1.0.19-2.jar"))
+    // Inert on every platform except Linux aarch64. Covers SDK 26 to 37.
+    testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-linux-aarch64:4.17-1")
 }
 
 tasks.withType<Test>().configureEach {
+    // SDK 36 and 37 need Java 21. SDK 35 needs 17.
     javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) })
     jvmArgs(
         "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
@@ -73,51 +65,86 @@ tasks.withType<Test>().configureEach {
 }
 ```
 
-Then run your tests as usual, for example with `@Config(sdk = [36])`. On any other platform the stock
-Robolectric loader is used, so the same build file works on x86_64 and macOS machines.
+Then run your tests as usual, for example with `@Config(sdk = [36])`. The plugin picks the library for
+the SDK under test. On any other platform the stock Robolectric loader is used, so the same build file
+works on x86_64 and macOS machines.
 
-To load a library you built yourself instead of the bundled one:
-`-Drobolectric.arm64.nativeLibrary=/abs/path/libandroid_runtime.so`.
+The dependency brings the libraries for SDK 26 to 34, 35, 36 and 37, 29 MB of jars. If you only test at
+some of them, exclude the others; the test then fails with a message naming the artifact if it needs one
+you left out. At SDK 37, Espresso must be 3.8.0-alpha03 or later, because 3.7.0 calls a method SDK 37
+removed.
 
-More in [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md): Maven usage, the version scheme, and how new
-Robolectric and android-all releases are handled.
+To load a library you built yourself instead:
+`-Drobolectric.arm64.nativeLibrary=/abs/path/libandroid_runtime.so -Drobolectric.arm64.nativeLibrarySdk=35`.
+It is used at that SDK only, because a library for another SDK would abort the JVM.
+
+More in [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md): every artifact and version, Maven usage, and how
+new Robolectric and android-all releases are handled.
 
 ## How it was verified
 
-Three kinds of evidence, all reproducible with the code in this repository.
+Three kinds of evidence, all reproducible with the code in this repository. Everything in the table was
+measured on one arm64 VM, through the jars of `4.17-1`, resolved from a Maven repository by the one
+dependency line. CI has not run this layout yet.
 
-**Structure.** The library exports the same 226 symbols as the official x86_64 library and registers the
-same 1,328 JNI methods in the same tables and the same order. A post-link checker enforces the glibc
-floor (highest symbol version GLIBC_2.30), the allowed `NEEDED` entries, the export list, `RELRO` and
-`BIND_NOW`. CI repeats the JNI and export comparison against the official library on every build.
-
-**Robolectric's own test suites.** `robolectric/src/test` (minus 7 files that need SDK 37),
-`integration_tests/nativegraphics` and `integration_tests/ctesque`, compiled against the published 4.17
-artifacts and run with `-Drobolectric.enabledSdks=36` on a native arm64 JVM:
-
-| Module | Tests | Pass | Fail | Skipped |
+| SDK | Library | Rig tests passed | Images identical to the official library | Worst difference (of 255) |
 | --- | --- | --- | --- | --- |
-| robotests | 7,886 | 7,865 | 14 | 7 |
-| nativegraphics | 770 | 767 | 1 | 2 |
-| ctesque | 430 | 427 | 0 | 3 |
-| Total | 9,086 | 9,059 | 15 | 12 |
+| 30 | compat | 33 of 33 | 17 of 37 | 47 |
+| 34 | compat | 33 of 33 | 16 of 37 | 171 |
+| 35 | sdk35 | 33 of 33 | 24 of 37 | 135 |
+| 36 | sdk36 | 33 of 33 | 28 of 37 | 135 |
+| 37 | sdk37 | 33 of 33 | 28 of 37 | 135 |
 
-None of the 15 failures involves the library: 13 tests force the legacy sqlite4java mode, which has no
-linux-aarch64 native; one runs at SDK 37; one (`ShadowNativeTableMaskFilterTest`) fails the same way with
-the official library in this harness. The full run takes about 5 minutes on a 2-core Ampere Altra (Neoverse-N1) VM with 11 GB RAM.
-The same suites on the official x86_64 library under qemu-user were estimated at over three hours, so
-the comparison with the official library was made on a subset: 81 native-relevant robotests classes plus
-all of nativegraphics and ctesque, about 2,650 tests. On that subset both libraries fail
-`ShadowNativeTableMaskFilterTest`, and the arm64 build additionally fails only the SQLite and SDK 37
-tests above.
+No image exceeded its ceiling in `tests/rig/baseline/`. SDK 35 gives the same result on Java 17 and on
+Java 21. **Pixels** below explains the differences. The suites did not run at SDK 30 and 34 through this
+loader; the compat jars are byte-identical to the released ones.
+
+**Structure.** Each library exports the same symbols as the official x86_64 library for its SDK (SDK 36:
+226, SDK 35: 223, SDK 37: 225) and registers the same JNI methods in the same tables and the same order
+(1,328, 1,299 and 1,380). A post-link checker enforces the glibc floor (highest symbol version GLIBC_2.30),
+the allowed `NEEDED` entries, the export list, `RELRO` and `BIND_NOW`. CI repeats the JNI and export
+comparison against the official library on every build.
+
+**Robolectric's own test suites.** `robolectric/src/test` (minus 7 files that need compileSdk 37),
+`integration_tests/nativegraphics` and `integration_tests/ctesque`, compiled against the published 4.17
+artifacts and run with `-Drobolectric.enabledSdks` at one SDK on a native arm64 JVM. Full runs at SDK 26 to
+34 are in [docs/COMPAT.md](docs/COMPAT.md).
+
+| SDK | robotests | nativegraphics | ctesque | Total | Failed |
+| --- | --- | --- | --- | --- | --- |
+| 35 | 7,801 | 769 | 429 | 8,999 | 14 |
+| 36 | 7,886 | 770 | 430 | 9,086 | 14 |
+| 37 | 7,800 | 769 | 429 | 8,998 | 14 |
+
+The counts come from the JUnit XML and include 12 skipped tests at SDK 35 and 36 and 14 at SDK 37. The
+same 14 tests fail at each SDK, and none of them points at the library:
+
+* 13 tests force LEGACY SQLite through sqlite4java, which has no linux-aarch64 native. These are
+  independent of this project.
+* `ShadowNativeTableMaskFilterTest` cannot create its test runner. It fails the same way on the official
+  library.
+
+With a file override at SDK 35 or 36 instead of the jars, `ShadowViewThreadTest.testNewestSdk` also fails,
+because it runs at SDK 37, where that override does not apply. Through the jars it passes.
+
+The full suites on the official x86_64 library under qemu-user were estimated at over three hours, so the
+comparison with the official library was made per test on less than the full run, and the scope differs
+by SDK:
+
+| SDK | Compared per test with Google's library | Not compared |
+| --- | --- | --- |
+| 36 | 81 native-relevant robotests classes, all of nativegraphics and ctesque, about 2,650 tests | the other robotests classes |
+| 35 | nativegraphics and ctesque, 1,198 tests: 0 differ in outcome | **all of robotests** |
+| 37 | an 81-class subset of robotests, all of nativegraphics and ctesque, 2,627 tests: only the 13 LEGACY SQLite tests differ | the other robotests classes |
 
 **Pixels.** A rig renders 37 scenes (canvas, bitmaps and codecs, text in 12 scripts, framework views,
 Compose Material 3) through `PixelCopy` and Roborazzi and compares them with goldens made by the official
 x86_64 library:
 
-* The same tree built for **x86_64** and run under qemu-user renders **37 of 37 images identical to the
-  official library**, maximum difference 0. So the build recipe (flags, toolchain, closure) is faithful.
-* The **arm64** build renders 28 of 37 images identical. The other nine differ by 1 to 4 levels per
+* At SDK 36, the same tree built for **x86_64** and run under qemu-user renders **37 of 37 images identical
+  to the official library**, maximum difference 0. So the build recipe (flags, toolchain, closure) is
+  faithful. There is no such control for SDK 35 and 37 yet.
+* The SDK 36 **arm64** build renders 28 of 37 images identical. The other nine differ by 1 to 4 levels per
   channel in seven images, by up to 29 levels in one (a rotated bilinear bitmap) and by 135 levels in
   8 pixels of one (a perspective shader sample landing on the neighbouring texel). These differences come
   from Skia's NEON code paths, not from the build: NEON reciprocal estimates with a different number of
@@ -125,17 +152,21 @@ x86_64 library:
   exists only on ARM. Google's own mac/aarch64 library is built from the same Skia with NEON enabled and
   should show the same differences; this has been reasoned from the code and not tested on a Mac.
   If you use screenshot tests, goldens recorded on x86_64 need a tolerance of a few levels on arm64.
-  The rig keeps per-image ceilings in `tests/rig/baseline/arm64.json` so that an image cannot get worse
+  The rig keeps per-image ceilings per SDK in `tests/rig/baseline/` so that an image cannot get worse
   unnoticed.
+* SDK 37 has the same nine images with the same numbers. SDK 35 has those nine plus four `view-*` images
+  that differ by 1 level on anti-aliased glyph edges. Those four are explained only by how they look.
 
 Details, including the audit of later AOSP host fixes, are in [docs/NOTES.md](docs/NOTES.md),
 "Verification".
 
 ## Limitations
 
-* **One SDK, one android-all build.** The library registers natives for one android-all build. The loader
-  uses it only for SDK 36 and hands every other SDK to the stock loader, because a mismatch aborts the JVM
-  in `JNI_OnLoad`.
+* **One library, one android-all build.** A library registers natives for one android-all build, and a
+  mismatch aborts the JVM in `JNI_OnLoad`. So each SDK has its own artifact and its own path, and a library
+  has to follow its android-all: when Robolectric moves an SDK to a new build, that SDK needs a new library.
+* **SDK 37 input code.** `MotionPredictor` loads, but no test here runs TensorFlow Lite inference with a
+  real model.
 * **Reflection into Robolectric 4.17.** The plugin calls private methods of `DefaultNativeRuntimeLoader`.
   It fails with a message naming the missing method when a Robolectric release renames one, but each
   Robolectric release needs a check.
@@ -146,17 +177,18 @@ Details, including the audit of later AOSP host fixes, are in [docs/NOTES.md](do
   clang and lld package revisions come from the Ubuntu archive at build time, so a later package update
   can change the output ([docs/reproducibility.md](docs/reproducibility.md)). The SDK 34 and below
   library is reproducible byte for byte only when built at the same checkout path: a clang bug leaves
-  the path in ten harfbuzz debug names, which changes the build-id (the code is the same).
+  the path in ten harfbuzz debug names, which changes the build-id (the code is the same). For SDK 35
+  and 37 the only evidence is a clean build matching an incremental one on one machine.
 * **Architecture details.** `char` is unsigned and `long double` is IEEE binary128 on aarch64. SQLite may
   round a text-to-real conversion near the precision limit differently from the x86_64 library.
 
 ## Building from source
 
-On Ubuntu 26.04 arm64:
+On Ubuntu 26.04 arm64, for SDK 36:
 
 ```
 sudo apt-get install clang lld llvm cmake ninja-build python3 patch libc++-21-dev libc++abi-21-dev \
-    rustc cargo flex bison git curl xz-utils ca-certificates gnupg gpgv debian-archive-keyring
+    rustc cargo flex bison git curl xz-utils ca-certificates gnupg gpgv debian-archive-keyring libclang1-21
 tools/fetch.py                           # AOSP sources into src/, about 0.9 GB, verified against the lock file
 rust/install-toolchain.sh                # rustc 1.83.0 (SHA-256 and signature checked)
 python3 -I toolchain/make-sysroot.py     # Debian 11 arm64 sysroot, about 30 MB
@@ -167,10 +199,11 @@ ninja -C build/out -j2                   # build/out/lib/libandroid_runtime.so a
 
 A clean build takes 35 to 45 minutes with `-j2` on a 2-core Ampere Altra (Neoverse-N1) VM with 11 GB RAM. Each parallel job needs about
 1.2 GB of RAM, and the whole build about 4 GB of disk. `ci/build.sh` runs the same sequence plus the
-checks, stripping and checksums.
+checks, stripping and checksums. SDK 35 takes 68 minutes and SDK 37 2 h 23 min; `ci/build.sh --sdk 35`
+builds another one.
 
-[docs/BUILDING.md](docs/BUILDING.md) has the details: what each step verifies, the x86_64 control build,
-the comparison with the official library, the loader jar, and moving to another AOSP release.
+[docs/BUILDING.md](docs/BUILDING.md) has the details: every target, what each step verifies, the x86_64
+control build, the comparison with the official library, the jars, and moving to another AOSP release.
 [docs/NOTES.md](docs/NOTES.md) explains how Soong's rules are mirrored, where each compiler flag comes
 from, and the deviations from Soong.
 
@@ -181,13 +214,14 @@ The fidelity rig and the harness for Robolectric's own suites are in `tests/` (`
 
 | Path | What |
 | --- | --- |
-| `config/`, `overrides/`, `patches/` | The AOSP pin, the projects to fetch, lock files, manual build knowledge, source patches |
+| `config/`, `overrides/`, `patches/` | The AOSP pin, the projects to fetch, lock files, manual build knowledge, source patches. SDK 36 at the top level, the others under `config/sdk35/`, `config/sdk37/`, `config/compat/` |
 | `tools/`, `cmake/`, `CMakeLists.txt` | The `Android.bp` to CMake generator and the CMake build |
 | `toolchain/`, `rust/` | Debian 11 sysroot, LLVM runtimes, the pinned Rust toolchain and the Rust part of the library |
-| `loader/` | The Robolectric `NativeRuntimeLoader` plugin, packaged as the published jar |
+| `loader/` | The Robolectric `NativeRuntimeLoader` plugin, packaged as the published jar with no library |
+| `libraries/` | The library artifacts: one build file for all five, a version file per artifact |
 | `tests/rig/` | Fidelity rig: scenes, x86_64 goldens, arm64 baseline |
 | `tests/upstream/` | Harness for Robolectric's own test suites |
-| `ci/`, `.github/workflows/` | CI build script, checks and the GitHub Actions workflow |
+| `ci/`, `.github/workflows/` | CI build scripts, checks and the GitHub Actions workflows |
 | `docs/` | Build notes, licensing audit, distribution and reproducibility notes |
 
 ## Licenses
@@ -195,9 +229,9 @@ The fidelity rig and the harness for Robolectric's own suites are in `tests/` (`
 The scripts, the loader plugin, the rig and the documentation in this repository are licensed under the
 Apache License 2.0 (see `LICENSE` and `NOTICE`).
 
-The compiled library is built from the Android Open Source Project and other open source projects under
-their own licenses. The build writes their notices to `NOTICE` next to the library; releases ship that
-file as `THIRD_PARTY_NOTICES`, next to the library and inside the jar. Notices that the licenses require
+The compiled libraries are built from the Android Open Source Project and other open source projects under
+their own licenses. The build writes their notices to `NOTICE` next to each library; releases ship that
+file as `THIRD_PARTY_NOTICES`, next to the library and inside its jar. Notices that the licenses require
 to be displayed with binary redistributions:
 
 * This product includes DNG technology under license by Adobe Systems Incorporated.
@@ -205,13 +239,18 @@ to be displayed with binary redistributions:
 * This product includes software derived from the RSA Data Security, Inc. MD5 Message-Digest Algorithm.
 * This software is based in part on the work of the Independent JPEG Group.
 * This software is based in part on the work of the FreeType Team. Portions of this software are
-  copyright (c) 2023 The FreeType Project (www.freetype.org) in the SDK 36 library and copyright (c) 2020
-  in the compat library. All rights reserved. FreeType is used under the FreeType License.
+  copyright (c) 2023 The FreeType Project (www.freetype.org) in the SDK 35, 36 and 37 libraries and
+  copyright (c) 2020 in the compat library. All rights reserved. FreeType is used under the FreeType
+  License.
 
-The library includes Adobe's DNG SDK, which is distributed under the DNG SDK License Agreement. Among its
+The SDK 37 library also includes Eigen under the Mozilla Public License 2.0, compiled in unmodified. Its
+source is `external/eigen` at the AOSP tag `android-17.0.0_r1`
+(https://android.googlesource.com/platform/external/eigen).
+
+The libraries include Adobe's DNG SDK, which is distributed under the DNG SDK License Agreement. Among its
 terms, a party that distributes the software in a commercial product agrees to indemnify Adobe against
 claims arising from that distribution (section 5). Using the library as a test dependency does not
-redistribute it. If you ship it inside a product, read that agreement first. The official Robolectric
-library contains the same component.
+redistribute it. If you ship a library inside a product, read that agreement first. The official
+Robolectric libraries contain the same component.
 
 [docs/LICENSING.md](docs/LICENSING.md) has the full audit.

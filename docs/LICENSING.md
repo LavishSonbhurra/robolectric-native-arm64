@@ -3,8 +3,8 @@
 This is an engineering audit, not legal advice. Nothing here has been cleared by a lawyer.
 
 Scope: what we redistribute when we publish `libandroid_runtime.so` (and a jar that bundles it)
-for Linux arm64, SDK 36, built from AOSP `android-16.0.0_r1`. The build scripts, the loader plugin and
-the test rig are our own work and are covered in the last sections.
+for Linux arm64, SDK 36, built from AOSP `android-16.0.0_r1`. SDK 35 and 37 are in section 3.7. The build
+scripts, the loader plugin and the test rig are our own work and are covered in the last sections.
 
 ## 1. Summary
 
@@ -182,6 +182,32 @@ glibc and `crtbeginS.o`/`crtendS.o` from GCC; they are covered by the same two e
 libwebp is BSD-3-Clause with a separate "Additional IP Rights Grant (Patents)" (`PATENTS`): a royalty-free
 patent license that ends for a licensee who starts patent litigation over WebM. Ship the file. No action
 beyond that.
+
+### 3.7 SDK 35 and SDK 37
+
+Each library artifact has its own generated notices file, so each one lists what its own link took. The
+checks of section 7 run for every target.
+
+SDK 35 has the same components as SDK 36, plus the `cfg-if` crate and its own Rust standard library entry
+(1.78.0). The Adobe, MD5, IJG and FreeType sentences are the same.
+
+SDK 37 links 31 more components, from TensorFlow Lite and its dependencies, libjxl with highway and
+brotli, XMP-Toolkit-SDK, Rust font crates and serde_json. They were read for what a binary must carry:
+
+* **Eigen is MPL-2.0**, the only copyleft licence in the library, with file-level scope. Section 3.2
+  requires telling recipients of the binary how to get the source. The POM description and `SOURCES.txt`
+  of the SDK 37 artifact name `external/eigen` at the AOSP tag. It is compiled unmodified.
+* **`COPYING.MINPACK`** asks for an acknowledgment of the University of Chicago in end-user documentation.
+  It does not apply: the code it covers is `unsupported/Eigen/.../LevenbergMarquardt` and
+  `NonLinearOptimization`, and the compiler's dependency output for the whole SDK 37 build shows neither.
+  The text stays in the notices file because AOSP lists it for the project.
+* **XMP-Toolkit-SDK** is BSD-3-Clause from Adobe: no sentence beyond the notice. Its copyright line is not
+  a reason to add a third Adobe sentence.
+* **libjxl** ships a `PATENTS` grant, in the notices file.
+* **fft2d** is "by exception only" in AOSP, is built, and is not linked ([SDK37.md](SDK37.md)).
+
+So the sentences required at the top of the notices file are the same for all three SDK libraries, and
+`ci/check-release.py` holds each POM description to its own notices file.
 
 ## 4. Attribution text that must appear in the README and in the notices file
 

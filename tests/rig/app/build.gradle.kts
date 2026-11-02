@@ -39,16 +39,17 @@ kotlin {
  *   rig.out       output directory for the PNGs
  *   rig.nativeLib absolute path of a libandroid_runtime to force through the arm64 loader
  *   rig.stock     leave the arm64 loader jar off the classpath (pure upstream baseline)
- *   rig.loaderJar use this prebuilt loader jar instead of the :loader project (for example
- *                 the release jar with the library bundled)
+ *   rig.artifact  depend on robolectric-nativeruntime-linux-aarch64 at this version instead of
+ *                 the :loader project, resolved from rig.artifactRepo with its dependencies, as a
+ *                 user's build does (leave rig.nativeLib unset)
+ *   rig.loaderJar use this prebuilt loader jar instead of the :loader project
  *   rig.heap      test JVM heap (default 1280m)
  *   rig.tmp       java.io.tmpdir for the test JVM (default .work/tmp, on disk)
  *   rig.sdk       SDK level to run (default 36; tests say sdk = ALL_SDKS, this filters)
  *   rig.nativeLibSdk SDK level rig.nativeLib was built for (default 36; below 35 means the
  *                 SDK <= 34 compat library, librobolectric-nativeruntime)
- *   rig.compatJar also put these compat jars (comma-separated; the SDK <= 34 library as a
- *                 classpath resource) on the test classpath (tests the release artifacts; leave
- *                 rig.nativeLib unset)
+ *   rig.compatJar also put these jars (comma-separated) on the test classpath, for example a
+ *                 compat or SDK library jar without the rest (leave rig.nativeLib unset)
  *   rig.compatPixels native or x86: which compat jar the loader takes when both are present
  */
 fun configureRig(test: Test) {
@@ -112,11 +113,13 @@ dependencies {
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)
     if (!providers.gradleProperty("rig.stock").isPresent) {
+        val artifact = providers.gradleProperty("rig.artifact")
         val loaderJar = providers.gradleProperty("rig.loaderJar")
-        if (loaderJar.isPresent) {
+        if (artifact.isPresent) {
+            testRuntimeOnly("io.github.lavishsonbhurra:robolectric-nativeruntime-linux-aarch64:${artifact.get()}")
+        } else if (loaderJar.isPresent) {
             testRuntimeOnly(files(loaderJar.get()))
         } else {
-            // The library is bundled only if ra64.nativeLib or RA64_NATIVE_LIB is set.
             testRuntimeOnly(project(":loader"))
         }
         providers.gradleProperty("rig.compatJar").orNull?.let { jars ->

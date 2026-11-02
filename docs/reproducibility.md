@@ -9,6 +9,10 @@ a local build on an Ampere Altra VM (Ubuntu 26.04 host, checkout under the home 
 `366cf8c87a5de93f75b4a470f30695e4a8d16655`. The `reproduce` job in `.github/workflows/build.yml` keeps
 testing this and fails on any byte of difference.
 
+The `reproduce` job runs for SDK 35 and 37 too, but it has not run yet. For those two the only evidence
+so far is one machine and one path: a clean build gave the same bytes as the incremental one. Treat them
+as "not yet known to be reproducible across paths and machines".
+
 ## What the comparison covers
 
 The distributed file is the stripped library (`llvm-strip --strip-all`, dynamic symbols kept). Its GNU

@@ -22,7 +22,9 @@ ninja -C build/sdk35
 ```
 
 A clean build without ccache takes 68 minutes on 2 vCPU (`-j2`), and gives the same library,
-byte for byte, as the incremental build the tests ran on.
+byte for byte, as the incremental build the tests ran on. The numbers below are for that library,
+unstripped except where it says otherwise; stripped with `llvm-strip --strip-all`, as `ci/build.sh`
+does, it is 14,584,872 bytes, SHA-256 `d72034a849931c3ddbeed1c5d3c3df28e1b9627017073aa84fb18851a1914e01`.
 
 The closure has 111 modules, 77 of them compiled, 2,313 C and C++ sources and 4 host tools.
 
@@ -249,19 +251,14 @@ The build's notice check reports 49 components, 59 distinct texts, 0 problems.
 and Cornell notices of dng_sdk and the Adobe terms are in the file. The Rust standard library entry
 is 1.78.0.
 
-## What the loader needs
+## Loading it
 
-The loader works today with an override:
-`-Drobolectric.arm64.nativeLibrary=/path/libandroid_runtime.so` and
-`-Drobolectric.arm64.nativeLibrarySdk=35`. The system properties it sets already fit SDK 35:
-`use_base_native_hostruntime`, `core_native_classes`, `graphics_native_classes` and
-`method_binding_format`.
+`robolectric-nativeruntime-sdk35-linux-aarch64` holds the library at
+`native/linux/aarch64/sdk35/libandroid_runtime.so`, and the loader picks it at SDK 35. The system
+properties it sets already fit SDK 35: `use_base_native_hostruntime`, `core_native_classes`,
+`graphics_native_classes` and `method_binding_format`.
 
-For a normal dependency it needs per-SDK library selection. `robolectric.arm64.nativeLibrarySdk`
-defaults to 36, and there is a single `ARM64_RESOURCE` path, so a jar with both libraries needs one
-resource path per SDK, chosen from the SDK under test.
-
-SDK 35 needs a test JVM of Java 17 or later.
+SDK 35 needs a test JVM of Java 17 or later. Robolectric checks that, so the loader does not.
 
 The class list passed in `core_native_classes` comes from Robolectric, so entries that the library
 lacks would surface as missing registrations. All class names in the library match the official
@@ -284,4 +281,7 @@ list, so this is the same as with Google's library.
   nothing calls it (no call site, no stored pointer). It is dead code from a host source list, left
   out here. It cannot change behaviour.
 * `frameworks/native` 0001 reproduces observed behaviour, not a known commit.
+* **robotests against Google's library.** The 15 known failures were compared with Google's library
+  for nativegraphics and ctesque only. robotests was not compared per test, because it is too slow
+  under qemu here.
 * Tests ran on one arm64 VM with one glibc.

@@ -1,17 +1,23 @@
-# Builds libandroid_runtime.so (SDK 36, AOSP android-16.0.0_r1) for Linux arm64 on the free GitHub
-# arm64 runner, checks it, runs the fidelity rig against it, packages it and attests the result.
+# Builds libandroid_runtime.so for SDK 35, 36 and 37 for Linux arm64 on the free GitHub arm64 runner,
+# checks each one, runs the fidelity rig against it, packages it and attests the result. Each SDK is
+# a matrix entry, so each AOSP tree gets its own runner and its own 14 GB disk: never all three in
+# one job. ci/sdk-env.sh holds what differs between them.
 #
-# This workflow has not run on GitHub yet. Its build and test commands are the ones used locally,
-# but expect fixes on the first run on the hosted runner. Numbers in the comments come from the local builds recorded in
-# docs/NOTES.md (a 2-core Ampere Altra (Neoverse-N1) VM with 11 GB RAM) and are estimates for the 4 vCPU / 16 GB / 14 GB runner.
+# The SDK 36 jobs have run on GitHub. The SDK 35 and 37 jobs, and the matrix as a whole, have not:
+# their commands are the ones used locally, but expect fixes on the first run on the hosted runner.
+# Numbers in the comments come from the local builds recorded in docs/NOTES.md, docs/SDK35.md and
+# docs/SDK37.md (a 2-core Ampere Altra (Neoverse-N1) VM with 11 GB RAM) and are estimates for the
+# 4 vCPU / 16 GB / 14 GB runner.
 #
 # Jobs
-#   build      container ubuntu:26.04, about 40 to 60 min cold, about 30 to 40 min with warm caches
-#   rig        host runner, needs build; native arm64 JVM, Gradle, Robolectric 4.17; about 15 to 25 min
-#   package    host runner, needs build and rig; loader jar, checksums, provenance attestation
-#   reproduce  container, needs build; clean rebuild in another path and VM; weekly, on tags and
-#              on demand. Compares the stripped library byte for byte (ci/compare-libs.py).
-#   upstream   optional (manual or tag): Robolectric's own suites, about 25 min
+#   build           container ubuntu:26.04. Clean build on the 2-core VM: SDK 35 68 min, SDK 36 35 to
+#                   45 min, SDK 37 2 h 23 min
+#   rig             host runner, needs build; native arm64 JVM, Gradle, Robolectric 4.17; about 15 to 25 min
+#   package         host runner, needs build and rig; the library jar, checksums, provenance attestation
+#   package-loader  host runner, needs rig; the loader jar, which holds no library
+#   reproduce       container, needs build; clean rebuild in another path and VM; weekly, on tags and
+#                   on demand. Compares the stripped library byte for byte (ci/compare-libs.py).
+#   upstream        optional (manual or tag): Robolectric's own suites at that SDK, about 25 min
 #
 # Repository settings this workflow relies on (nothing else is referenced):
 #   * Actions are pinned by commit SHA (version in the comment next to each one).
@@ -46,26 +52,24 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # Reference build the library must register natives for. Robolectric downloads this jar itself
-  # when the rig runs; the hash pins what the JNI comparison is made against.
-  ANDROID_ALL_VERSION: 16-robolectric-13921718-i7
-  ANDROID_ALL_SHA256: 16f1f751643d1d3d5592008846bbdfc1e57cff15e6ec303d26584de3b6ac25ec
   PACKAGES: >-
     clang lld cmake ninja-build python3 patch libc++-21-dev libc++abi-21-dev rustc cargo flex bison
     git curl xz-utils ca-certificates gnupg gpgv debian-archive-keyring unzip zstd pkg-config
-    llvm binutils
+    llvm binutils libclang1-21
 
 jobs:
   # ---------------------------------------------------------------------------------------------
   build:
     runs-on: ubuntu-24.04-arm            # 4 vCPU, 16 GB RAM, 14 GB disk for public repositories
-    timeout-minutes: 150
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [35, 36, 37]
     container:
       # Pinned by digest (ubuntu:26.04 as of 2026-10-20). apt-get still installs the archive's
       # current package versions; build-info.txt records the clang, lld and rustc that were used.
       image: ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944
-    outputs:
-      sha256: ${{ steps.sum.outputs.sha256 }}
     steps:
       - name: Install build packages
         run: |
@@ -81,44 +85,44 @@ jobs:
       - name: Mark the workspace as safe for git
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      # Sources: about 0.9 GB extracted, a few hundred MB compressed. tools/fetch.py verifies
+      - name: Settings for this SDK
+        run: ci/sdk-env.sh ${{ matrix.sdk }} >> "$GITHUB_ENV"
+
+      # Sources: 0.9 GB extracted (SDK 37: 1.8 GB), a few hundred MB compressed. tools/fetch.py verifies
       # every project against config/sources.lock.json (content hash), so a poisoned or stale
       # cache is detected and re-fetched instead of trusted.
       - name: Cache AOSP sources
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: src
-          key: aosp-src-${{ hashFiles('config/sources.lock.json', 'config/projects.toml') }}
-          restore-keys: aosp-src-
+          path: ${{ env.SRC_DIR }}
+          key: aosp-src-sdk${{ matrix.sdk }}-${{ hashFiles(format('{0}/sources.lock.json', env.CONFIG_DIR), format('{0}/projects.toml', env.CONFIG_DIR)) }}
+          restore-keys: aosp-src-sdk${{ matrix.sdk }}-
 
       # Toolchain downloads: LLVM source tarball (about 140 MB, pinned SHA-256 and signature),
-      # Rust 1.83.0 tarball (237 MB, pinned SHA-256 and signature), Debian 11 snapshot packages
-      # (about 30 MB, locked). The install scripts re-verify what they find.
+      # the target's Rust tarball (237 MB for 1.83.0, pinned SHA-256 and signature), Debian 11
+      # snapshot packages (about 30 MB, locked). The install scripts re-verify what they find.
       - name: Cache toolchain downloads
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             toolchain/dl
-            rust/toolchain/dl
+            rust/toolchain*/dl
             ~/.cargo/registry
-          key: toolchain-dl-${{ hashFiles('toolchain/*.lock.json', 'toolchain/build-runtimes.sh', 'rust/install-toolchain.sh', 'tools/cargo/*.lock') }}
-          restore-keys: toolchain-dl-
+          key: toolchain-dl-sdk${{ matrix.sdk }}-${{ hashFiles('toolchain/*.lock.json', 'toolchain/build-runtimes.sh', 'rust/install-toolchain.sh', 'tools/cargo/*.lock', format('{0}/cargo/*.lock', env.CONFIG_DIR)) }}
+          restore-keys: toolchain-dl-sdk${{ matrix.sdk }}-
 
       - name: Build
-        run: ci/build.sh -j"$(nproc)" --out dist
+        run: ci/build.sh -j"$(nproc)" --out dist --sdk ${{ matrix.sdk }}
 
       - name: Record sizes
         run: |
           df -h /
-          du -sh src build toolchain/out toolchain/dl rust/toolchain ~/.cargo 2>/dev/null || true
+          du -sh "$SRC_DIR" build toolchain/out toolchain/dl "$RUST_DIR" ~/.cargo 2>/dev/null || true
           ls -l dist
-
-      - id: sum
-        run: echo "sha256=$(sha256sum dist/libandroid_runtime.so | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: arm64-library
+          name: arm64-library-sdk${{ matrix.sdk }}
           path: |
             dist/libandroid_runtime.so
             dist/THIRD_PARTY_NOTICES
@@ -132,9 +136,9 @@ jobs:
       # comparison groups methods into tables by our symbols, which the stripped file lacks.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: arm64-library-unstripped
+          name: arm64-library-unstripped-sdk${{ matrix.sdk }}
           path: |
-            build/out/lib/libandroid_runtime.so
+            ${{ env.BUILD_DIR }}/lib/libandroid_runtime.so
             dist/libandroid_runtime.so.debug
           if-no-files-found: error
           retention-days: 7
@@ -144,14 +148,21 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [35, 36, 37]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
+      - name: Settings for this SDK
+        run: ci/sdk-env.sh ${{ matrix.sdk }} >> "$GITHUB_ENV"
+
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: arm64-library
+          name: arm64-library-sdk${{ matrix.sdk }}
           path: dist
 
       - name: Verify the downloaded library
@@ -160,7 +171,7 @@ jobs:
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
-          java-version: "21"           # SDK 36 needs Java 21 (android-all 16 is class file 65)
+          java-version: "21"           # SDK 36 and 37 need Java 21; SDK 35 needs 17 and runs on 21
 
       - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
 
@@ -208,14 +219,22 @@ jobs:
           ./gradlew --no-daemon -p tests/rig :app:testDebugUnitTest \
             -Prig.java="$JAVA_HOME/bin/java" \
             -Prig.out="$PWD/out/arm64" \
-            -Prig.nativeLib="$PWD/dist/libandroid_runtime.so"
+            -Prig.nativeLib="$PWD/dist/libandroid_runtime.so" \
+            -Prig.sdk=${{ matrix.sdk }} -Prig.nativeLibSdk=${{ matrix.sdk }} \
+            ${ESPRESSO:+-Prig.espresso=$ESPRESSO}
+
+      # 33 tests. A green Gradle run that ran none proves nothing.
+      - name: Count the tests
+        run: |
+          python3 -I ci/check-upstream-failures.py tests/rig/app/build/test-results/testDebugUnitTest \
+            --expected /dev/null --min-tests 33
 
       - name: Compare against the x86_64 goldens
         run: |
           sudo apt-get install -y --no-install-recommends python3-pil
-          python3 tests/rig/scripts/compare.py tests/rig/goldens/x86_64 out/arm64 \
+          python3 tests/rig/scripts/compare.py "tests/rig/goldens/$RIG_GOLDENS" out/arm64 \
             --diff-dir out/arm64/_diff --json out/arm64/_report.json || true   # tolerance is the baseline, below
-          python3 -I ci/check-baseline.py out/arm64/_report.json --baseline tests/rig/baseline/arm64.json
+          python3 -I ci/check-baseline.py out/arm64/_report.json --baseline "tests/rig/baseline/$RIG_BASELINE"
 
       - name: Check which library was loaded
         run: |
@@ -224,7 +243,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: arm64-library-unstripped
+          name: arm64-library-unstripped-sdk${{ matrix.sdk }}
           path: unstripped
 
       # JNI registration tables and exported symbols against the official library. The official
@@ -235,16 +254,16 @@ jobs:
           jar=$(ls ~/.m2/repository/org/robolectric/android-all-instrumented/${ANDROID_ALL_VERSION}/*.jar | head -1)
           echo "${ANDROID_ALL_SHA256}  ${jar}" | sha256sum --check -
           mkdir -p ref && unzip -qo -j "$jar" native/linux/x86_64/libandroid_runtime.so -d ref
-          python3 -I tools/jni_tables.py compare ref/libandroid_runtime.so unstripped/build/out/lib/libandroid_runtime.so > jni-compare.txt || true
+          python3 -I tools/jni_tables.py compare ref/libandroid_runtime.so "unstripped/$BUILD_DIR/lib/libandroid_runtime.so" > jni-compare.txt || true
           cat jni-compare.txt
-          diff -u ci/expected-jni-compare.txt jni-compare.txt     # only the known differences are allowed
+          diff -u "$EXPECTED_JNI" jni-compare.txt                 # only the known differences are allowed
           python3 -I tools/jni_tables.py dynsym ref/libandroid_runtime.so dist/libandroid_runtime.so
           rm -rf ref
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: rig-output
+          name: rig-output-sdk${{ matrix.sdk }}
           path: |
             out/arm64
             tests/rig/app/build/reports
@@ -260,6 +279,10 @@ jobs:
       contents: read
       id-token: write          # artifact attestations
       attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [35, 36, 37]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -267,7 +290,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: arm64-library
+          name: arm64-library-sdk${{ matrix.sdk }}
           path: dist
 
       - run: cd dist && sha256sum --check --ignore-missing SHA256SUMS
@@ -279,30 +302,79 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
 
-      # Picks up dist/THIRD_PARTY_NOTICES next to the library as META-INF/THIRD_PARTY_NOTICES.
-      - name: Build the loader jar with the library inside
+      # Same GitHub release as every other SDK and compat, so every asset name holds the SDK level.
+      # The notices next to the library go in as META-INF/THIRD_PARTY_NOTICES.
+      - name: Build the library jar
+        env:
+          SDK: ${{ matrix.sdk }}
         run: |
-          ./gradlew --no-daemon :loader:jar -Pra64.nativeLib="$PWD/dist/libandroid_runtime.so"
+          ./gradlew --no-daemon ":sdk$SDK:jar" ":sdk$SDK:sourcesJar" ":sdk$SDK:javadocJar" \
+            "-Pra64.sdk${SDK}Lib=$PWD/dist/libandroid_runtime.so"
           mkdir -p release
-          cp loader/build/libs/*.jar release/
-          cp dist/libandroid_runtime.so dist/THIRD_PARTY_NOTICES dist/notices.json dist/build-info.txt release/
-          cd release && sha256sum * > SHA256SUMS && cat SHA256SUMS
+          cp "libraries/sdk$SDK/build/libs/"*.jar release/
+          cp dist/libandroid_runtime.so "release/libandroid_runtime-sdk$SDK.so"
+          for f in THIRD_PARTY_NOTICES notices.json build-info.txt; do
+            cp "dist/$f" "release/sdk$SDK-$f"
+          done
+          cd release && sha256sum * > "sdk$SDK-SHA256SUMS" && cat "sdk$SDK-SHA256SUMS"
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
-            release/libandroid_runtime.so
+            release/libandroid_runtime-sdk${{ matrix.sdk }}.so
             release/*.jar
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: release
+          name: release-sdk${{ matrix.sdk }}
           path: release
           retention-days: 90
 
-      # The GitHub release is made from this artifact. Maven Central is a separate workflow
+      # The GitHub release is made from these artifacts. Maven Central is a separate workflow
       # (release.yml) with its own secrets. This workflow uses no secrets.
+
+  # ---------------------------------------------------------------------------------------------
+  # The loader holds no library, so one job is enough and it needs no build output. It waits for
+  # the rig of every SDK, so a release has a loader only when all of them passed.
+  package-loader:
+    needs: rig
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+
+      - name: Build the loader jar
+        run: |
+          ./gradlew --no-daemon :loader:jar :loader:sourcesJar :loader:javadocJar
+          mkdir -p release
+          cp loader/build/libs/*.jar release/
+          cd release && sha256sum * > SHA256SUMS && cat SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: release/*.jar
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-loader
+          path: release
+          retention-days: 90
 
   # ---------------------------------------------------------------------------------------------
   # Rebuild from scratch on another VM, in another directory, with another -j, no caches, and
@@ -312,7 +384,11 @@ jobs:
     needs: build
     if: github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v') || inputs.reproduce
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 150
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [35, 36, 37]
     container:
       image: ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944   # same image as the build job
     steps:
@@ -327,7 +403,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: arm64-library
+          name: arm64-library-sdk${{ matrix.sdk }}
           path: first
 
       # Different path and a different -j from the first build. No cache restore: this job fetches
@@ -339,7 +415,7 @@ jobs:
           mkdir -p /opt/ra64-second
           git archive HEAD | tar -x -C /opt/ra64-second
           cd /opt/ra64-second
-          ci/build.sh -j3 --out "$GITHUB_WORKSPACE/second"
+          ci/build.sh -j3 --out "$GITHUB_WORKSPACE/second" --sdk ${{ matrix.sdk }}
 
       # The build maps the checkout and build directories out of the debug info, so the two
       # stripped libraries must be byte-identical, build-id included. compare-libs.py exits 3
@@ -360,7 +436,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: reproducibility-report
+          name: reproducibility-report-sdk${{ matrix.sdk }}
           path: |
             diffoscope.txt
             second/SHA256SUMS
@@ -372,13 +448,19 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || inputs.upstream
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [35, 36, 37]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Settings for this SDK
+        run: ci/sdk-env.sh ${{ matrix.sdk }} >> "$GITHUB_ENV"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: arm64-library
+          name: arm64-library-sdk${{ matrix.sdk }}
           path: dist
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -415,22 +497,23 @@ jobs:
           python3 -I toolchain/make-sysroot.py --arch amd64
           echo "QEMU_LD_PREFIX=$PWD/toolchain/out/sysroot-bullseye-amd64" >> "$GITHUB_ENV"
 
-      # Clones robolectric at the tag, runs robotests, nativegraphics and ctesque at SDK 36 with
-      # -Drobolectric.enabledSdks=36 and the loader plugin injected by an init script
+      # Clones robolectric at the tag, runs robotests, nativegraphics and ctesque at this SDK with
+      # -Drobolectric.enabledSdks and the loader plugin injected by an init script
       # (tests/upstream/scripts/arm64.init.gradle.kts). 262 to 614 s wall on a 2-core Ampere Altra VM, 3 GB heap.
       - name: Run the upstream suites
         run: |
-          ARM64_LIB="$PWD/dist/libandroid_runtime.so" tests/upstream/scripts/run.sh arm64 ci \
-            -Psuite.heap=3g :robotests:test :nativegraphics:testDebugUnitTest :ctesque:testDebugUnitTest || true
+          SDKS=${{ matrix.sdk }} ARM64_LIB="$PWD/dist/libandroid_runtime.so" tests/upstream/scripts/run.sh arm64 ci \
+            -Psuite.heap=3g -Parm64.nativeLibrarySdk=${{ matrix.sdk }} ${ESPRESSO:+-Psuite.espresso=$ESPRESSO} \
+            :robotests:test :nativegraphics:testDebugUnitTest :ctesque:testDebugUnitTest || true
 
       - name: Compare failures with the known list
         run: |
           python3 -I ci/check-upstream-failures.py tests/upstream/results/ci/junit \
-            --expected ci/upstream-expected-failures.txt --min-tests 9000
+            --expected "$EXPECTED_FAILURES" --min-tests "$MIN_TESTS"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: upstream-junit
+          name: upstream-junit-sdk${{ matrix.sdk }}
           path: tests/upstream/results/ci
           retention-days: 14

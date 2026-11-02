@@ -25,7 +25,9 @@ A clean build without ccache took 8,604 s of ninja time (2 h 23 min), `-j2` on t
 with memhold stopped. That includes cargo builds of aconfig, cxxbridge and bindgen. It ran in three
 slices under the shared build lock, because two steps failed on the way and were fixed; nothing was
 recompiled between slices. The result is byte-identical to the incremental ccache build that the
-tests below ran on (SHA-256 `b406e55ddea0c95e...`, unstripped; stripped 23,999,864 bytes).
+tests below ran on (SHA-256 `b406e55ddea0c95e...`, unstripped). Stripped with `llvm-strip --strip-all`,
+as `ci/build.sh` does, it is 23,999,616 bytes, SHA-256
+`fa0b0791f116be7090d6cffe022eb07a4148c34c34803de90210b4734739a0c1`.
 
 The closure has 289 modules, 168 of them compiled, 3,559 C and C++ sources and 6 host tools (SDK
 36: 115, 81, 2,350 and 4). The Rust part is 44 crates, 31 of them in `librustlibs.a`.
@@ -193,7 +195,7 @@ Robolectric 4.17, native arm64, JDK 21, `SDKS=37`, `-Psuite.heap=3g`:
 
 Wall time on the 2 vCPU VM: 353 s for robotests and nativegraphics, 84 s for ctesque.
 
-The expected-failure list is `config/sdk37/upstream-expected-failures.txt`: 14 tests, and
+The expected-failure list is `ci/upstream-expected-failures-sdk37.txt`: 14 tests, and
 `ci/check-upstream-failures.py` passes on 8,984 tests. The comparison with the official library is
 per test, on the subset that is practical under qemu (the 81 robotests classes that touch native
 code, all of nativegraphics, all of ctesque), x86_64 JDK 21 with the stock loader, 2,446 s:
@@ -221,13 +223,11 @@ here because it is the test that runs at SDK 37.
 * `robotests` still excludes 7 files that need SDK 37 APIs to compile. Running them needs compileSdk
   37 and the plain `android-all:17-robolectric-15733970` jar on the compile classpath.
 
-## What the loader needs
+## Loading it
 
-Nothing in the library. With `-Drobolectric.arm64.nativeLibrary=<file>` and
-`-Drobolectric.arm64.nativeLibrarySdk=37` the current loader loads it and every test above ran that
-way. To ship it, the loader has to pick the bundled library by `SDK_INT`, since a library only
-matches its own android-all, and `LIBRARY_SDK_PROPERTY` defaults to 36 today. The stripped library
-is 24.0 MB, against 15.2 MB for SDK 36.
+Nothing in the library needed a change. `robolectric-nativeruntime-sdk37-linux-aarch64` holds it at
+`native/linux/aarch64/sdk37/libandroid_runtime.so`, and the loader picks it at SDK 37. SDK 37 needs
+Java 21, which Robolectric checks itself. The stripped library is 24.0 MB, against 15.2 MB for SDK 36.
 
 ## Notices
 
@@ -236,7 +236,11 @@ is 24.0 MB, against 15.2 MB for SDK 36.
 New entries in `config/sdk37/notices-*.toml`:
 
 * Eigen is MPL-2.0, built with `EIGEN_MPL2_ONLY`. It is acknowledged in the policy, with the source
-  location. It is compiled unmodified through TensorFlow Lite.
+  location. It is compiled unmodified through TensorFlow Lite. Section 3.2 of the MPL wants recipients
+  of the binary told where the source is, so the POM description and `SOURCES.txt` of this artifact
+  say so. `COPYING.MINPACK` is in the notices because it is in the project, but its acknowledgment does
+  not apply: none of the compile steps sees `LevenbergMarquardt` or `NonLinearOptimization`, the only
+  MINPACK-derived code in Eigen.
 * fft2d is "by exception only" in AOSP. It is built but not linked: only TensorFlow Lite's rfft2d
   kernel needs it and the linker drops that kernel, so nothing from it is in the library.
 * Excerpts of the contributors' copyright lines from three expat sources, and notes naming The
@@ -254,4 +258,6 @@ New entries in `config/sdk37/notices-*.toml`:
 * How the official build drops Perfetto and the fatal messages, and which change gave it the
   `nextId` fix. Public source stops at r1.
 * The 7 robotests files above, which need compileSdk 37.
-* The x86_64 target of this config, and the release path (`ci/`, jars): nothing was published.
+* **robotests against Google's library.** Only the 81 classes that touch native code were compared
+  per test, because the full suite is too slow under qemu here.
+* The x86_64 target of this config.

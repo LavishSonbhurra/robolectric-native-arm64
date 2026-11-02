@@ -11,9 +11,19 @@ pluginManagement {
     }
 }
 
+// rig.artifactRepo: a Maven repository with the published artifacts (build/central-staging of the
+// root build), for runs that resolve them the way a user does. See rig.artifact in app/.
+val artifactRepo: String? = providers.gradleProperty("rig.artifactRepo").orNull
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        if (artifactRepo != null) {
+            maven {
+                url = uri(artifactRepo)
+                content { includeGroup("io.github.lavishsonbhurra") }
+            }
+        }
         google()
         mavenCentral()
     }
