@@ -65,6 +65,7 @@ external/eigen at the AOSP revision recorded in the release's source lock."""
 
 [[acknowledged]]
 id = "external_fft2d_license"
-reason = """Takuya Ooura's FFT package, compiled in through TensorFlow Lite, unmodified.
-Its licence allows use, copying and modification for any purpose without fee,
-and distribution of the original package. AOSP marks it "by exception only"."""
+reason = """Takuya Ooura's FFT package. AOSP marks it "by exception only". It is a dependency
+of TensorFlow Lite's rfft2d kernel, which the linker drops, so nothing from it is in
+the library (it is listed under not_linked). Its terms only clearly allow distributing
+the original package, so read them again if this archive is ever linked."""

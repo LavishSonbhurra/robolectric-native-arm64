@@ -236,8 +236,9 @@ is 24.0 MB, against 15.2 MB for SDK 36.
 New entries in `config/sdk37/notices-*.toml`:
 
 * Eigen is MPL-2.0, built with `EIGEN_MPL2_ONLY`. It is acknowledged in the policy, with the source
-  location. fft2d is "by exception only" in AOSP; its terms allow use for any purpose, and
-  distribution of the original package. Both are compiled unmodified through TensorFlow Lite.
+  location. It is compiled unmodified through TensorFlow Lite.
+* fft2d is "by exception only" in AOSP. It is built but not linked: only TensorFlow Lite's rfft2d
+  kernel needs it and the linker drops that kernel, so nothing from it is in the library.
 * Excerpts of the contributors' copyright lines from three expat sources, and notes naming The
   TensorFlow Authors.
 * The Rust standard library entry uses 1.93.1's `COPYRIGHT-library.html`, which lists the licences
