@@ -86,6 +86,15 @@ excerpts = [
 ]
 reason = "Notices that the DNG SDK's NOTICE and LICENSE files do not carry, in two compiled sources."
 
+[[supplement]]
+license = "external_expat_license"
+excerpts = [
+  {file = "external/expat/expat/lib/xmlparse.c", begin = "Copyright (c) 1997-2000 Thai Open Source Software Center Ltd", end = "USE OR OTHER DEALINGS IN THE SOFTWARE."},
+  {file = "external/expat/expat/lib/xmlrole.c", begin = "Copyright (c) 1997-2000 Thai Open Source Software Center Ltd", end = "USE OR OTHER DEALINGS IN THE SOFTWARE."},
+  {file = "external/expat/expat/lib/xmltok.c", begin = "Copyright (c) 1997-2000 Thai Open Source Software Center Ltd", end = "USE OR OTHER DEALINGS IN THE SOFTWARE."},
+]
+reason = "The contributors' copyright lines in the compiled sources. COPYING names only Thai Open Source and the Expat maintainers."
+
 [[note]]
 license = "external_dng_sdk_license"
 text = "AOSP's licence module also lists the Apache-2.0 and MIT kinds; the terms that ship with this code are the agreement and notices printed for this entry."
@@ -113,6 +122,14 @@ text = "Source files also name Arm Holdings as a copyright holder."
 [[note]]
 license = "external_harfbuzz_ng_license"
 text = "Source files also name Grigori Goronzy as a copyright holder."
+
+[[note]]
+license = "external_tensorflow_license"
+text = "The copyright holder named in the source is The TensorFlow Authors."
+
+[[note]]
+license = "external_ruy_license"
+text = "The copyright holders named in the source are Google LLC and The TensorFlow Authors."
 
 [[note]]
 license = "external_wuffs-mirror-release-c_license"

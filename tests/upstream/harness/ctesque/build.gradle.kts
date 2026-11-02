@@ -5,7 +5,7 @@ val mod = File(upstream, "integration_tests/ctesque")
 android {
     compileSdk = 36   // upstream: 37
     namespace = "org.robolectric.integrationtests.ctesque"
-    defaultConfig { minSdk = 23 }
+    defaultConfig { minSdk = if (findProperty("suite.espresso") == null) 23 else 24 }
     lint { abortOnError = false }
     testOptions {
         targetSdk = 36
@@ -43,7 +43,7 @@ dependencies {
     testImplementation("androidx.test.ext:junit:1.3.0")
     testImplementation("androidx.test.ext:truth:1.7.0")
     testImplementation("androidx.test:core:1.7.0")
-    testImplementation("androidx.test.espresso:espresso-core:3.7.0")
+    testImplementation("androidx.test.espresso:espresso-core:${findProperty("suite.espresso") ?: "3.7.0"}")
     testImplementation("com.google.truth:truth:1.4.5")
     testImplementation("com.google.guava:guava:33.6.0-jre")
 }
