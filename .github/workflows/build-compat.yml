@@ -393,7 +393,7 @@ jobs:
             -Psuite.heap=3g :robotests:test :nativegraphics:testDebugUnitTest :ctesque:testDebugUnitTest || true
       - name: Compare failures with the known list
         run: |
-          python3 -I ci/check-upstream-failures.py tests/upstream/results/ci-compat/junit \
+          python3 -I ci/check-upstream-failures.py tests/upstream/results/ci-compat/junit --min-tests 70000 \
             --expected ci/upstream-expected-failures-compat.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()

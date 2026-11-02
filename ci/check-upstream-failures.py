@@ -3,7 +3,8 @@
 
 Usage: check-upstream-failures.py JUNIT_DIR --expected ci/upstream-expected-failures.txt
 JUNIT_DIR holds the XML files, either flat or in one sub-directory per module
-(robotests, nativegraphics, ctesque). Exit status 1 if a test fails that is not listed.
+(robotests, nativegraphics, ctesque). Exit status 1 if a test fails that is not listed, or if
+fewer than --min-tests tests ran.
 Listed tests that pass are reported but do not fail the job. Standard library only.
 """
 import argparse
@@ -17,6 +18,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("junit")
     ap.add_argument("--expected", required=True)
+    ap.add_argument("--min-tests", type=int, default=1,
+                    help="fail with fewer tests than this: a run that stopped early has no failures either")
     a = ap.parse_args()
     expected = set()
     for line in open(a.expected):
@@ -42,7 +45,9 @@ def main():
         print("NEW FAILURE", *f, sep="\t")
     for f in fixed:
         print("now passing", *f, sep="\t")
-    sys.exit(1 if new else 0)
+    if total < a.min_tests:
+        print(f"TOO FEW TESTS: {total} ran, at least {a.min_tests} expected")
+    sys.exit(1 if new or total < a.min_tests else 0)
 
 
 if __name__ == "__main__":

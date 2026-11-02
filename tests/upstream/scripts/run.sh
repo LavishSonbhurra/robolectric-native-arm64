@@ -49,12 +49,12 @@ elif [ "$(git -C "$W/src" rev-parse HEAD)" != "$(git -C "$W/src" rev-parse -q --
   echo ">> warning: src/ is not at tag $REF" >&2
 fi
 
-args=(--no-daemon -p "$W/harness" --max-workers=1 --continue "-Psuite.sdks=${SDKS:-36}")
+SDKS="${SDKS:-36}"
+args=(--no-daemon -p "$W/harness" --max-workers=1 --continue "-Psuite.sdks=$SDKS")
 # SDK levels below 35 use the SDK <= 34 library (librobolectric-nativeruntime.so): ARM64_LIB
 # names that file and the loader is told so (robolectric.arm64.nativeLibrarySdk).
 compat=1
 for s in ${SDKS//,/ }; do [ "$s" -ge 35 ] && compat=0; done
-[ -z "${SDKS:-}" ] && compat=0
 case "$MODE" in
   arm64)
     if [ "$compat" = 1 ]; then deflib="$REPO/build/compat/lib/librobolectric-nativeruntime.so"
