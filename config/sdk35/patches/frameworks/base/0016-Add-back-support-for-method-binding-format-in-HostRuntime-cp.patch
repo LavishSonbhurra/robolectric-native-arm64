@@ -1,0 +1,28 @@
+Add back support for 'method_binding_format' in HostRuntime.cpp
+
+Upstream: platform/frameworks/base commit 9cf2fa6a79a
+
+Why: the official library reads method_binding_format in HostRuntime.
+
+diff --git a/core/jni/platform/host/HostRuntime.cpp b/core/jni/platform/host/HostRuntime.cpp
+index 19f82998c1a..78f79a63e47 100644
+--- a/core/jni/platform/host/HostRuntime.cpp
++++ b/core/jni/platform/host/HostRuntime.cpp
+@@ -359,6 +359,17 @@ void AndroidRuntime::onStarted() {
+ 
+ void AndroidRuntime::start(const char* className, const Vector<String8>& options, bool zygote) {
+     JNIEnv* env = AndroidRuntime::getJNIEnv();
++
++    jstring propertyString =
++            (jstring)env->CallStaticObjectMethod(systemClass, getPropertyId,
++                                                 env->NewStringUTF("method_binding_format"),
++                                                 env->NewStringUTF(""));
++    const char* propertyChars = env->GetStringUTFChars(propertyString, 0);
++    auto method_binding_format = string(propertyChars);
++    env->ReleaseStringUTFChars(propertyString, propertyChars);
++
++    setJniMethodFormat(method_binding_format);
++
+     // Register native functions.
+     if (startReg(env) < 0) {
+         ALOGE("Unable to register all android native methods\n");

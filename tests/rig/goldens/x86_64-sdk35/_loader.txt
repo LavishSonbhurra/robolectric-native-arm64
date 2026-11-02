@@ -1,0 +1,4 @@
+loader=org.robolectric.nativeruntime.DefaultNativeRuntimeLoader
+loadedFrom=null
+os.arch=amd64
+java.version=17.0.20.1

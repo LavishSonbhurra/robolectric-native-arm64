@@ -2,7 +2,8 @@
 """Generate rustc invocations (a Ninja file) for the Rust part of a Soong
 closure, from the Android.bp files, the way Soong's rust rules run rustc.
 
-Reads rust/rustlibs.toml (roots and pruned dependencies), resolves the
+Reads rust/rustlibs.toml, or the target's own rustlibs.toml when it has one
+(tools/target.py; roots and pruned dependencies), resolves the
 host linux_glibc arm64 (or --arch x86_64) variant of every rust_library, rust_library_host,
 rust_ffi_static and rust_proc_macro module reached from the roots through
 `rustlibs` and `proc_macros` (with bp2cmake's Soong resolver: defaults,
@@ -52,7 +53,9 @@ import bp2cmake  # noqa: E402  (Soong module index and variant resolver)
 ROOT = bp2cmake.ROOT
 SRC = bp2cmake.SRC
 
-RUST_DEFAULT_VERSION = "1.83.0"  # rust/config/global.go RustDefaultVersion
+# rust/config/global.go RustDefaultVersion; [rust] version of the target's
+# aosp.toml when it pins another one.
+RUST_DEFAULT_VERSION = bp2cmake.load_toml(bp2cmake.target.AOSP_TOML).get("rust", {}).get("version", "1.83.0")
 DEFAULT_EDITION = "2021"         # rust/config/global.go DefaultEdition
 # Soong's linux_glibc x86_64 triple is x86_64-unknown-linux-gnu.
 RUST_TRIPLES = {"arm64": "aarch64-unknown-linux-gnu", "x86_64": "x86_64-unknown-linux-gnu"}
@@ -75,6 +78,13 @@ GLOBAL_RUST_FLAGS = [
     "-Z link-native-libraries=no",
     "--cfg soong",
 ]
+
+STALE_VERSIONS = bp2cmake.load_toml(bp2cmake.target.AOSP_TOML).get("rust", {}).get("stale_cargo_pkg_version", [])
+
+# Android 15: -Z unstable-options is not there yet (it came with the --extern
+# force: dylib support).
+if RUST_DEFAULT_VERSION == "1.78.0":
+    GLOBAL_RUST_FLAGS.remove("-Z unstable-options")
 
 # rust/config/lints.go
 RUSTC_DEFAULT_LINTS = "-A deprecated -A unknown_lints -D missing-docs -D warnings -D unsafe_op_in_unsafe_fn"
@@ -132,6 +142,7 @@ class Crate:
         self.features = props.get("features", [])
         self.cfgs = props.get("cfgs", [])
         self.version = props.get("cargo_pkg_version", "")
+        self.real_version = None
         self.rustlibs = []
         self.proc_macros = []
         self.cc_deps = []
@@ -302,11 +313,12 @@ def check_versions(crates):
     """Android.bp cargo_pkg_version against the crate's Cargo.toml and
     against external/rust/android-crates-io/pseudo_crate/Cargo.lock."""
     lockp = os.path.join(SRC, "external/rust/android-crates-io/pseudo_crate/Cargo.lock")
-    with open(lockp, "rb") as f:
-        lock = tomllib.load(f)
     locked = {}
-    for p in lock.get("package", []):
-        locked.setdefault(p["name"], set()).add(p["version"])
+    if os.path.exists(lockp):  # older trees have one project per crate, no lock
+        with open(lockp, "rb") as f:
+            lock = tomllib.load(f)
+        for p in lock.get("package", []):
+            locked.setdefault(p["name"], set()).add(p["version"])
     report = []
     for c in crates:
         tomlp = os.path.join(SRC, c.dir, "Cargo.toml")
@@ -323,7 +335,13 @@ def check_versions(crates):
             with open(tomlp, "rb") as f:
                 pkg = tomllib.load(f).get("package", {})
             if pkg.get("version") != c.version:
-                raise Error(f"{c.module}: Android.bp says {c.version}, {tomlp} says {pkg.get('version')}")
+                # [rust] stale_cargo_pkg_version in aosp.toml: Android.bp not
+                # regenerated upstream. Soong passes its value to rustc as is.
+                if c.module not in STALE_VERSIONS:
+                    raise Error(f"{c.module}: Android.bp says {c.version}, {tomlp} says {pkg.get('version')}")
+                report.append((c, pkg.get("version"), f"Android.bp says {c.version}, stale upstream"))
+                c.real_version = pkg.get("version")
+                continue
         name = (pkg or {}).get("name") or os.path.basename(c.dir)
         if c.dir.startswith("external/rust/android-crates-io/"):
             if c.version not in locked.get(name, set()):
@@ -352,7 +370,8 @@ def ninja_escape(s):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--config", default=os.path.join(ROOT, "rust", "rustlibs.toml"))
+    own = os.path.join(bp2cmake.target.CONFIG, "rustlibs.toml")
+    ap.add_argument("--config", default=own if os.path.exists(own) else os.path.join(ROOT, "rust", "rustlibs.toml"))
     ap.add_argument("--rustc", required=True)
     ap.add_argument("--cxxbridge", required=True)
     ap.add_argument("--host-cc", default="clang", help="linker driver for proc macros (host .so)")
@@ -380,7 +399,8 @@ def main():
     # The C++ half of every bridge must come from the same cxx release as
     # the Rust half (the cxxbridge_macro proc macro). Checked at build time,
     # because cxxbridge may itself be built by the same build.
-    want = cl.crates["libcxxbridge_macro"].version if "libcxxbridge_macro" in cl.crates else ""
+    macro = cl.crates.get("libcxxbridge_macro")
+    want = (getattr(macro, "real_version", None) or macro.version) if macro else ""
 
     os.makedirs(out, exist_ok=True)
     meta = conf["staticlib"]

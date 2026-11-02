@@ -1,0 +1,39 @@
+Allow loading of host runtime for Windows
+
+Upstream: platform/frameworks/base commit 3248101b101
+
+Why: reorganises HostRuntime; the later commits build on it. The official
+library has its Linux side.
+
+diff --git a/core/jni/platform/host/HostRuntime.cpp b/core/jni/platform/host/HostRuntime.cpp
+index 78f79a63e47..8dc5ef0ba79 100644
+--- a/core/jni/platform/host/HostRuntime.cpp
++++ b/core/jni/platform/host/HostRuntime.cpp
+@@ -402,7 +402,6 @@ public:
+ 
+ } // namespace android
+ 
+-#ifndef _WIN32
+ using namespace android;
+ 
+ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void*) {
+@@ -411,12 +410,14 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void*) {
+         return JNI_ERR;
+     }
+ 
+-    Vector<String8> args;
+-    HostRuntime runtime;
++    string useBaseHostRuntime = getJavaProperty(env, "use_base_native_hostruntime");
++    if (useBaseHostRuntime == "true") {
++        Vector<String8> args;
++        HostRuntime runtime;
+ 
+-    runtime.onVmCreated(env);
+-    runtime.start("HostRuntime", args, false);
++        runtime.onVmCreated(env);
++        runtime.start("HostRuntime", args, false);
++    }
+ 
+     return JNI_VERSION_1_6;
+ }
+-#endif

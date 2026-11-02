@@ -1,0 +1,19 @@
+Fix wrong type in host version of ThreadBase
+
+Upstream: platform/frameworks/base commit 89acb1c5843
+
+Why: host hwui fix, prerequisite of the later commits.
+
+diff --git a/libs/hwui/platform/host/thread/ThreadBase.h b/libs/hwui/platform/host/thread/ThreadBase.h
+index d709430cc9b..b4e7bd34971 100644
+--- a/libs/hwui/platform/host/thread/ThreadBase.h
++++ b/libs/hwui/platform/host/thread/ThreadBase.h
+@@ -48,7 +48,7 @@ protected:
+         nsecs_t nextWakeup = mQueue.nextWakeup(lock);
+         std::chrono::nanoseconds duration = std::chrono::nanoseconds::max();
+         if (nextWakeup < std::numeric_limits<nsecs_t>::max()) {
+-            int timeout = nextWakeup - WorkQueue::clock::now();
++            nsecs_t timeout = nextWakeup - WorkQueue::clock::now();
+             if (timeout < 0) timeout = 0;
+             duration = std::chrono::nanoseconds(timeout);
+         }

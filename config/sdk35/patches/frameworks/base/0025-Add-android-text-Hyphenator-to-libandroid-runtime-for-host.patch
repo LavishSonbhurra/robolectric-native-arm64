@@ -1,0 +1,101 @@
+Add android_text_Hyphenator to libandroid_runtime for host
+
+Upstream: platform/frameworks/base commit 9a629e24776, adapted to r1
+
+Why: the official library has the Hyphenator table and the string
+ro.hyphen.data.dir. Adapted: MappedFile form kept, no trace calls in this
+file at r1.
+
+diff --git a/core/jni/Android.bp b/core/jni/Android.bp
+index 03e12b4232c..01a51ba53b9 100644
+--- a/core/jni/Android.bp
++++ b/core/jni/Android.bp
+@@ -77,6 +77,7 @@ cc_library_shared_for_libandroid_runtime {
+         "android_os_SystemProperties.cpp",
+         "android_os_Trace.cpp",
+         "android_text_AndroidCharacter.cpp",
++        "android_text_Hyphenator.cpp",
+         "android_util_EventLog.cpp",
+         "android_util_Log.cpp",
+         "android_util_StringBlock.cpp",
+@@ -168,7 +169,6 @@ cc_library_shared_for_libandroid_runtime {
+                 "android_view_SurfaceSession.cpp",
+                 "android_view_TextureView.cpp",
+                 "android_view_TunnelModeEnabledListener.cpp",
+-                "android_text_Hyphenator.cpp",
+                 "android_os_Debug.cpp",
+                 "android_os_GraphicsEnvironment.cpp",
+                 "android_os_HidlMemory.cpp",
+diff --git a/core/jni/android_text_Hyphenator.cpp b/core/jni/android_text_Hyphenator.cpp
+index 89fdeeb078d..97b7370c1b2 100644
+--- a/core/jni/android_text_Hyphenator.cpp
++++ b/core/jni/android_text_Hyphenator.cpp
+@@ -15,7 +15,12 @@
+  */
+ 
+ #include <fcntl.h>
++#ifdef __ANDROID__
+ #include <sys/mman.h>
++#else
++#include <android-base/mapped_file.h>
++#include <android-base/properties.h>
++#endif
+ #include <sys/stat.h>
+ #include <sys/types.h>
+ #include <unistd.h>
+@@ -28,7 +33,12 @@
+ namespace android {
+ 
+ static std::string buildFileName(const std::string& locale) {
++#ifdef __ANDROID__
+     constexpr char SYSTEM_HYPHENATOR_PREFIX[] = "/system/usr/hyphen-data/hyph-";
++#else
++    std::string hyphenPath = base::GetProperty("ro.hyphen.data.dir", "/system/usr/hyphen-data");
++    std::string SYSTEM_HYPHENATOR_PREFIX = hyphenPath + "/hyph-";
++#endif
+     constexpr char SYSTEM_HYPHENATOR_SUFFIX[] = ".hyb";
+     std::string lowerLocale;
+     lowerLocale.reserve(locale.size());
+@@ -49,11 +59,22 @@ static std::pair<const uint8_t*, size_t> mmapPatternFile(const std::string& loca
+         return std::make_pair(nullptr, 0);
+     }
+ 
++#ifdef __ANDROID__
+     void* ptr = mmap(nullptr, st.st_size, PROT_READ, MAP_SHARED, fd, 0 /* offset */);
+     close(fd);
+     if (ptr == MAP_FAILED) {
+         return std::make_pair(nullptr, 0);
+     }
++#else
++    std::unique_ptr<base::MappedFile> patternFile =
++            base::MappedFile::FromFd(fd, 0, st.st_size, PROT_READ);
++    close(fd);
++    if (patternFile == nullptr) {
++        return std::make_pair(nullptr, 0);
++    }
++    auto* mappedPtr = new base::MappedFile(std::move(*patternFile));
++    char* ptr = mappedPtr->data();
++#endif
+     return std::make_pair(reinterpret_cast<const uint8_t*>(ptr), st.st_size);
+ }
+ 
+diff --git a/core/jni/platform/host/HostRuntime.cpp b/core/jni/platform/host/HostRuntime.cpp
+index c32751ffe4b..53008b24a56 100644
+--- a/core/jni/platform/host/HostRuntime.cpp
++++ b/core/jni/platform/host/HostRuntime.cpp
+@@ -89,6 +89,7 @@ extern int register_android_os_SystemClock(JNIEnv* env);
+ extern int register_android_os_SystemProperties(JNIEnv* env);
+ extern int register_android_os_Trace(JNIEnv* env);
+ extern int register_android_text_AndroidCharacter(JNIEnv* env);
++extern int register_android_text_Hyphenator(JNIEnv* env);
+ extern int register_android_util_EventLog(JNIEnv* env);
+ extern int register_android_util_Log(JNIEnv* env);
+ extern int register_android_util_jar_StrictJarFile(JNIEnv* env);
+@@ -137,6 +138,7 @@ static const std::unordered_map<std::string, RegJNIRec> gRegJNIMap = {
+         {"android.os.SystemProperties", REG_JNI(register_android_os_SystemProperties)},
+         {"android.os.Trace", REG_JNI(register_android_os_Trace)},
+         {"android.text.AndroidCharacter", REG_JNI(register_android_text_AndroidCharacter)},
++        {"android.text.Hyphenator", REG_JNI(register_android_text_Hyphenator)},
+         {"android.util.EventLog", REG_JNI(register_android_util_EventLog)},
+         {"android.util.Log", REG_JNI(register_android_util_Log)},
+         {"android.util.jar.StrictJarFile", REG_JNI(register_android_util_jar_StrictJarFile)},

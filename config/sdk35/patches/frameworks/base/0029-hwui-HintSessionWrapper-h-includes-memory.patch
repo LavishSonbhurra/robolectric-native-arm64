@@ -1,0 +1,20 @@
+hwui: HintSessionWrapper.h includes <memory>
+
+Not an upstream commit on its own. android-16.0.0_r1 has the same line.
+
+Why: the header uses std::shared_ptr and relied on <future> pulling in
+<memory>, which the libc++ of clang 21 no longer does. Build fix with no
+effect on generated code.
+
+diff --git a/libs/hwui/renderthread/HintSessionWrapper.h b/libs/hwui/renderthread/HintSessionWrapper.h
+index 859cc57dea9..4c9656792da 100644
+--- a/libs/hwui/renderthread/HintSessionWrapper.h
++++ b/libs/hwui/renderthread/HintSessionWrapper.h
+@@ -20,6 +20,7 @@
+ #include <private/performance_hint_private.h>
+ 
+ #include <future>
++#include <memory>
+ #include <optional>
+ #include <vector>
+ 

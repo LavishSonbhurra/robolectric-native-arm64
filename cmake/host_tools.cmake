@@ -6,6 +6,11 @@ set(AOSP_RUST_STAGE "${CMAKE_BINARY_DIR}/rust/tree")
 set(AOSP_RUST_TARGET "${CMAKE_BINARY_DIR}/rust/target")
 set(_cargo_build ${Python3_EXECUTABLE} -I "${CMAKE_SOURCE_DIR}/tools/cargo_build.py"
     --stage "${AOSP_RUST_STAGE}" --target-dir "${AOSP_RUST_TARGET}")
+# Workspace manifest and lock files: the target's own when it has them.
+set(_cargo_cfg "${CMAKE_SOURCE_DIR}/tools/cargo")
+if(EXISTS "${_ra64_config}/cargo")
+  set(_cargo_cfg "${_ra64_config}/cargo")
+endif()
 
 # aconfig code generator (build/make/tools/aconfig/aconfig). The storage read
 # API Rust library (rust_ffi_static libaconfig_storage_read_api_cxx_bridge)
@@ -13,16 +18,16 @@ set(_cargo_build ${Python3_EXECUTABLE} -I "${CMAKE_SOURCE_DIR}/tools/cargo_build
 # Rust dependency of libandroid_runtime.
 set(_aconfig_args
     --workspace build/make/tools/aconfig
-    --manifest "${CMAKE_SOURCE_DIR}/tools/cargo/aconfig-workspace.toml"
-    --lock "${CMAKE_SOURCE_DIR}/tools/cargo/aconfig.Cargo.lock"
+    --manifest "${_cargo_cfg}/aconfig-workspace.toml"
+    --lock "${_cargo_cfg}/aconfig.Cargo.lock"
     --copy build/make/tools/aconfig --copy external/rust/cxx
     --link prebuilts/sdk)
 add_custom_command(
   OUTPUT "${AOSP_RUST_TARGET}/release/aconfig"
   COMMAND ${_cargo_build} ${_aconfig_args} -- build --release --locked -p aconfig
-  DEPENDS "${CMAKE_SOURCE_DIR}/tools/cargo/aconfig-workspace.toml"
-          "${CMAKE_SOURCE_DIR}/tools/cargo/aconfig.Cargo.lock"
-          "${CMAKE_SOURCE_DIR}/config/sources.lock.json"
+  DEPENDS "${_cargo_cfg}/aconfig-workspace.toml"
+          "${_cargo_cfg}/aconfig.Cargo.lock"
+          "${_ra64_config}/sources.lock.json"
   COMMENT "cargo: aconfig" USES_TERMINAL VERBATIM)
 add_custom_target(aconfig_tool DEPENDS "${AOSP_RUST_TARGET}/release/aconfig")
 
@@ -31,10 +36,10 @@ add_custom_command(
   OUTPUT "${AOSP_RUST_TARGET}/release/cxxbridge"
   COMMAND ${_cargo_build}
           --workspace external/rust/cxx
-          --lock "${CMAKE_SOURCE_DIR}/tools/cargo/cxx.Cargo.lock"
+          --lock "${_cargo_cfg}/cxx.Cargo.lock"
           --copy external/rust/cxx
           -- build --release --locked -p cxxbridge-cmd
-  DEPENDS "${CMAKE_SOURCE_DIR}/tools/cargo/cxx.Cargo.lock"
-          "${CMAKE_SOURCE_DIR}/config/sources.lock.json"
+  DEPENDS "${_cargo_cfg}/cxx.Cargo.lock"
+          "${_ra64_config}/sources.lock.json"
   COMMENT "cargo: cxxbridge" USES_TERMINAL VERBATIM)
 add_custom_target(cxxbridge_tool DEPENDS "${AOSP_RUST_TARGET}/release/cxxbridge")

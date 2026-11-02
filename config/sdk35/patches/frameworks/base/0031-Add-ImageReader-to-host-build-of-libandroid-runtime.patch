@@ -1,0 +1,357 @@
+Add ImageReader to host build of libandroid_runtime
+
+Upstream: platform/frameworks/base commit 79e0a16c62e, adapted to r1
+
+Why: the official library has the ImageReader, SurfaceImage and
+PublicFormatUtils tables and exports BufferQueue::createBufferQueue and
+Fence::NO_FENCE, which only this code pulls in. Adapted to the r1 files,
+which have no P210 support. nativeGetFenceFd is also left out on host: the
+commit keeps it, but the official SurfaceImage table has four methods and
+no nativeGetFenceFd.
+
+diff --git a/core/jni/Android.bp b/core/jni/Android.bp
+index a105a1ee849..0f02ab62ffe 100644
+--- a/core/jni/Android.bp
++++ b/core/jni/Android.bp
+@@ -73,6 +73,9 @@ cc_library_shared_for_libandroid_runtime {
+ 
+     srcs: [
+         "android_animation_PropertyValuesHolder.cpp",
++        "android_media_ImageReader.cpp",
++        "android_media_PublicFormatUtils.cpp",
++        "android_media_Utils.cpp",
+         "android_os_SystemClock.cpp",
+         "android_os_SystemProperties.cpp",
+         "android_os_Trace.cpp",
+@@ -134,10 +137,7 @@ cc_library_shared_for_libandroid_runtime {
+                 "android_app_ActivityThread.cpp",
+                 "android_app_NativeActivity.cpp",
+                 "android_app_admin_SecurityLog.cpp",
+-                "android_media_ImageReader.cpp",
+                 "android_media_ImageWriter.cpp",
+-                "android_media_PublicFormatUtils.cpp",
+-                "android_media_Utils.cpp",
+                 "android_opengl_EGL14.cpp",
+                 "android_opengl_EGL15.cpp",
+                 "android_opengl_EGLExt.cpp",
+diff --git a/core/jni/android_media_ImageReader.cpp b/core/jni/android_media_ImageReader.cpp
+index 3776d4391da..f755e5f1118 100644
+--- a/core/jni/android_media_ImageReader.cpp
++++ b/core/jni/android_media_ImageReader.cpp
+@@ -35,11 +35,20 @@
+ #include <android_runtime/android_view_Surface.h>
+ #include <android_runtime/android_graphics_GraphicBuffer.h>
+ #include <android_runtime/android_hardware_HardwareBuffer.h>
++#ifdef __ANDROID__
+ #include <grallocusage/GrallocUsageConversion.h>
++#else
++#define GRALLOC_USAGE_PROTECTED 0
++#define GRALLOC_USAGE_SW_READ_OFTEN 0
++#define GRALLOC_USAGE_SW_WRITE_OFTEN 0
++#endif
+ 
++#ifdef __ANDROID__
+ #include <private/android/AHardwareBufferHelpers.h>
++#endif
+ 
+ #include <jni.h>
++#include <jni_wrappers.h>
+ #include <nativehelper/JNIHelp.h>
+ 
+ #include <stdint.h>
+@@ -401,8 +410,12 @@ static void ImageReader_init(JNIEnv* env, jobject thiz, jobject weakThiz, jint w
+     String8 consumerName = String8::format("ImageReader-%dx%df%xm%d-%d-%d",
+             width, height, nativeHalFormat, maxImages, getpid(),
+             createProcessUniqueId());
++#ifdef __ANDROID__
+     uint64_t consumerUsage =
+             android_hardware_HardwareBuffer_convertToGrallocUsageBits(ndkUsage);
++#else
++    uint64_t consumerUsage = 0;
++#endif
+ 
+     bufferConsumer = new BufferItemConsumer(gbConsumer, consumerUsage, maxImages,
+             /*controlledByApp*/true);
+@@ -766,6 +779,7 @@ static bool Image_getLockedImageInfo(JNIEnv* env, LockedImage* buffer, int idx,
+     return true;
+ }
+ 
++#ifdef __ANDROID__
+ static void ImageReader_unlockGraphicBuffer(JNIEnv* env, jobject /*thiz*/,
+         jobject buffer) {
+     sp<GraphicBuffer> graphicBuffer =
+@@ -849,6 +863,7 @@ static jobjectArray ImageReader_createImagePlanes(JNIEnv* env, jobject /*thiz*/,
+ 
+     return imagePlanes;
+ }
++#endif
+ 
+ static jobjectArray Image_createSurfacePlanes(JNIEnv* env, jobject thiz,
+         int numPlanes, int halReaderFormat, uint64_t ndkReaderUsage)
+@@ -919,6 +934,7 @@ static jint Image_getHeight(JNIEnv* env, jobject thiz)
+     return getBufferHeight(buffer);
+ }
+ 
++#ifdef __ANDROID__
+ static jint Image_getFenceFd(JNIEnv* env, jobject thiz)
+ {
+     BufferItem* buffer = Image_getBufferItem(env, thiz);
+@@ -928,6 +944,7 @@ static jint Image_getFenceFd(JNIEnv* env, jobject thiz)
+ 
+     return -1;
+ }
++#endif
+ 
+ static jint Image_getFormat(JNIEnv* env, jobject thiz, jint readerFormat)
+ {
+@@ -952,6 +969,7 @@ static jint Image_getFormat(JNIEnv* env, jobject thiz, jint readerFormat)
+     }
+ }
+ 
++#ifdef __ANDROID__
+ static jobject Image_getHardwareBuffer(JNIEnv* env, jobject thiz) {
+     BufferItem* buffer = Image_getBufferItem(env, thiz);
+     AHardwareBuffer* b = AHardwareBuffer_from_GraphicBuffer(buffer->mGraphicBuffer.get());
+@@ -959,6 +977,7 @@ static jobject Image_getHardwareBuffer(JNIEnv* env, jobject thiz) {
+     // to link against libandroid.so
+     return android_hardware_HardwareBuffer_createFromAHardwareBuffer(env, b);
+ }
++#endif
+ 
+ } // extern "C"
+ 
+@@ -972,11 +991,13 @@ static const JNINativeMethod gImageReaderMethods[] = {
+     {"nativeImageSetup",       "(Landroid/media/Image;)I",   (void*)ImageReader_imageSetup },
+     {"nativeGetSurface",       "()Landroid/view/Surface;",   (void*)ImageReader_getSurface },
+     {"nativeDetachImage",      "(Landroid/media/Image;Z)I",   (void*)ImageReader_detachImage },
++#ifdef __ANDROID__
+     {"nativeCreateImagePlanes",
+         "(ILandroid/graphics/GraphicBuffer;IIIIII)[Landroid/media/ImageReader$ImagePlane;",
+                                                              (void*)ImageReader_createImagePlanes },
+     {"nativeUnlockGraphicBuffer",
+         "(Landroid/graphics/GraphicBuffer;)V",             (void*)ImageReader_unlockGraphicBuffer },
++#endif
+     {"nativeDiscardFreeBuffers", "()V",                      (void*)ImageReader_discardFreeBuffers }
+ };
+ 
+@@ -986,18 +1007,19 @@ static const JNINativeMethod gImageMethods[] = {
+     {"nativeGetWidth",          "()I",                       (void*)Image_getWidth },
+     {"nativeGetHeight",         "()I",                       (void*)Image_getHeight },
+     {"nativeGetFormat",         "(I)I",                      (void*)Image_getFormat },
++#ifdef __ANDROID__
+     {"nativeGetFenceFd",        "()I",                       (void*)Image_getFenceFd },
+     {"nativeGetHardwareBuffer", "()Landroid/hardware/HardwareBuffer;",
+                                                              (void*)Image_getHardwareBuffer },
++#endif
+ };
+ 
+ int register_android_media_ImageReader(JNIEnv *env) {
++    int ret1 = RegisterMethodsOrDie(env, "android/media/ImageReader", gImageReaderMethods,
++                                    NELEM(gImageReaderMethods));
+ 
+-    int ret1 = AndroidRuntime::registerNativeMethods(env,
+-                   "android/media/ImageReader", gImageReaderMethods, NELEM(gImageReaderMethods));
+-
+-    int ret2 = AndroidRuntime::registerNativeMethods(env,
+-                   "android/media/ImageReader$SurfaceImage", gImageMethods, NELEM(gImageMethods));
++    int ret2 = RegisterMethodsOrDie(env, "android/media/ImageReader$SurfaceImage", gImageMethods,
++                                    NELEM(gImageMethods));
+ 
+     return (ret1 || ret2);
+ }
+diff --git a/core/jni/android_media_PublicFormatUtils.cpp b/core/jni/android_media_PublicFormatUtils.cpp
+index 04494ad00a6..bcdf654d5a8 100644
+--- a/core/jni/android_media_PublicFormatUtils.cpp
++++ b/core/jni/android_media_PublicFormatUtils.cpp
+@@ -16,10 +16,10 @@
+ 
+ #define LOG_TAG "PublicFormatUtils_JNI"
+ 
+-#include <utils/misc.h>
+-#include <ui/PublicFormat.h>
+-#include <android_runtime/AndroidRuntime.h>
+ #include <jni.h>
++#include <jni_wrappers.h>
++#include <ui/PublicFormat.h>
++#include <utils/misc.h>
+ 
+ using namespace android;
+ 
+@@ -53,7 +53,6 @@ static const JNINativeMethod gMethods[] = {
+ };
+ 
+ int register_android_media_PublicFormatUtils(JNIEnv *env) {
+-    return AndroidRuntime::registerNativeMethods(env,
+-             "android/media/PublicFormatUtils", gMethods, NELEM(gMethods));
++    return RegisterMethodsOrDie(env, "android/media/PublicFormatUtils", gMethods, NELEM(gMethods));
+ }
+ 
+diff --git a/core/jni/android_media_Utils.cpp b/core/jni/android_media_Utils.cpp
+index fbebbdcb876..9c7210c5c71 100644
+--- a/core/jni/android_media_Utils.cpp
++++ b/core/jni/android_media_Utils.cpp
+@@ -17,9 +17,11 @@
+ // #define LOG_NDEBUG 0
+ #define LOG_TAG "AndroidMediaUtils"
+ 
++#ifdef __ANDROID__ // Layoutlib does not support hardware
+ #include <aidl/android/hardware/graphics/common/PlaneLayoutComponentType.h>
+ #include <ui/GraphicBufferMapper.h>
+ #include <ui/GraphicTypes.h>
++#endif
+ #include <utils/Log.h>
+ 
+ #include "android_media_Utils.h"
+@@ -471,6 +473,7 @@ status_t getLockedImageInfo(LockedImage* buffer, int idx,
+     return OK;
+ }
+ 
++#ifdef __ANDROID__
+ static status_t extractP010Gralloc4PlaneLayout(
+         sp<GraphicBuffer> buffer, void *pData, int format, LockedImage *outputImage) {
+     using aidl::android::hardware::graphics::common::PlaneLayoutComponent;
+@@ -543,6 +546,7 @@ static status_t extractP010Gralloc4PlaneLayout(
+     outputImage->chromaStep = 4;
+     return OK;
+ }
++#endif
+ 
+ status_t lockImageFromBuffer(sp<GraphicBuffer> buffer, uint32_t inUsage,
+         const Rect& rect, int fenceFd, LockedImage* outputImage) {
+@@ -581,11 +585,13 @@ status_t lockImageFromBuffer(sp<GraphicBuffer> buffer, uint32_t inUsage,
+             ALOGE("Lock buffer failed!");
+             return res;
+         }
++#ifdef __ANDROID__
+         if (isPossibly10BitYUV(format)
+                 && OK == extractP010Gralloc4PlaneLayout(buffer, pData, format, outputImage)) {
+             ALOGV("%s: Successfully locked the P010 image", __FUNCTION__);
+             return OK;
+         }
++#endif
+     }
+ 
+     outputImage->data = reinterpret_cast<uint8_t*>(pData);
+diff --git a/core/jni/jni_wrappers.h b/core/jni/jni_wrappers.h
+index e3e17eed54d..1f44994b54f 100644
+--- a/core/jni/jni_wrappers.h
++++ b/core/jni/jni_wrappers.h
+@@ -22,6 +22,8 @@
+ #include <log/log.h>
+ #include <nativehelper/JNIHelp.h>
+ 
++#include <string>
++
+ namespace android {
+ 
+ static inline jclass FindClassOrDie(JNIEnv* env, const char* class_name) {
+diff --git a/core/jni/platform/host/HostRuntime.cpp b/core/jni/platform/host/HostRuntime.cpp
+index 53008b24a56..28abae3c4a0 100644
+--- a/core/jni/platform/host/HostRuntime.cpp
++++ b/core/jni/platform/host/HostRuntime.cpp
+@@ -48,6 +48,8 @@ using namespace std;
+  * (see AndroidRuntime.cpp).
+  */
+ 
++extern int register_android_media_ImageReader(JNIEnv* env);
++extern int register_android_media_PublicFormatUtils(JNIEnv* env);
+ extern int register_android_os_Binder(JNIEnv* env);
+ extern int register_libcore_util_NativeAllocationRegistry(JNIEnv* env);
+ 
+@@ -128,6 +130,8 @@ static const std::unordered_map<std::string, RegJNIRec> gRegJNIMap = {
+ #endif
+         {"android.content.res.StringBlock", REG_JNI(register_android_content_StringBlock)},
+         {"android.content.res.XmlBlock", REG_JNI(register_android_content_XmlBlock)},
++        {"android.media.ImageReader", REG_JNI(register_android_media_ImageReader)},
++        {"android.media.PublicFormatUtils", REG_JNI(register_android_media_PublicFormatUtils)},
+ #ifdef __linux__
+         {"android.os.Binder", REG_JNI(register_android_os_Binder)},
+         {"android.os.FileObserver", REG_JNI(register_android_os_FileObserver)},
+diff --git a/libs/hostgraphics/include/gui/BufferItemConsumer.h b/libs/hostgraphics/include/gui/BufferItemConsumer.h
+index c2594115180..5c96c82e061 100644
+--- a/libs/hostgraphics/include/gui/BufferItemConsumer.h
++++ b/libs/hostgraphics/include/gui/BufferItemConsumer.h
+@@ -17,6 +17,8 @@
+ #ifndef ANDROID_GUI_BUFFERITEMCONSUMER_H
+ #define ANDROID_GUI_BUFFERITEMCONSUMER_H
+ 
++#include <com_android_graphics_libgui_flags.h>
++#include <gui/BufferQueue.h>
+ #include <gui/ConsumerBase.h>
+ #include <gui/IGraphicBufferConsumer.h>
+ #include <utils/RefBase.h>
+@@ -26,9 +28,22 @@ namespace android {
+ class BufferItemConsumer : public ConsumerBase {
+ public:
+     BufferItemConsumer(const sp<IGraphicBufferConsumer>& consumer, uint64_t consumerUsage,
+-                       int bufferCount, bool controlledByApp)
++                       int bufferCount = -1, bool controlledByApp = false)
+           : mConsumer(consumer) {}
+ 
++#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_CONSUMER_BASE_OWNS_BQ)
++    BufferItemConsumer(uint64_t consumerUsage, int bufferCount = -1,
++                       bool controlledByApp = false, bool isConsumerSurfaceFlinger = false) {
++        sp<IGraphicBufferProducer> producer;
++        BufferQueue::createBufferQueue(&producer, &mConsumer);
++        mSurface = sp<Surface>::make(producer, controlledByApp);
++    }
++
++    status_t setConsumerIsProtected(bool isProtected) {
++        return OK;
++    }
++#endif // COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_CONSUMER_BASE_OWNS_BQ)
++
+     status_t acquireBuffer(BufferItem* item, nsecs_t presentWhen, bool waitForFence = true) {
+         return mConsumer->acquireBuffer(item, presentWhen, 0);
+     }
+@@ -71,8 +86,20 @@ public:
+         return OK;
+     }
+ 
++#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_CONSUMER_BASE_OWNS_BQ)
++// Returns a Surface that can be used as the producer for this consumer.
++    sp<Surface> getSurface() const {
++        return mSurface;
++    }
++#endif // COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_CONSUMER_BASE_OWNS_BQ)
++
+ private:
+     sp<IGraphicBufferConsumer> mConsumer;
++#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_CONSUMER_BASE_OWNS_BQ)
++        // This Surface wraps the IGraphicBufferConsumer created for this
++    // ConsumerBase.
++    sp<Surface> mSurface;
++#endif // COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_CONSUMER_BASE_OWNS_BQ)
+ };
+ 
+ } // namespace android
+diff --git a/libs/hostgraphics/include/gui/Surface.h b/libs/hostgraphics/include/gui/Surface.h
+index 2774f89cb54..e268ce6ca76 100644
+--- a/libs/hostgraphics/include/gui/Surface.h
++++ b/libs/hostgraphics/include/gui/Surface.h
+@@ -34,6 +34,10 @@ public:
+         ANativeWindow::query = hook_query;
+     }
+ 
++    sp<IGraphicBufferProducer> getIGraphicBufferProducer() const {
++        return mBufferProducer;
++    }
++
+     static bool isValid(const sp<Surface>& surface) {
+         return surface != nullptr;
+     }
+diff --git a/libs/hostgraphics/include/ui/Fence.h b/libs/hostgraphics/include/ui/Fence.h
+index 187c3116f61..3364b8aed60 100644
+--- a/libs/hostgraphics/include/ui/Fence.h
++++ b/libs/hostgraphics/include/ui/Fence.h
+@@ -60,6 +60,10 @@ public:
+         return 0;
+     }
+ 
++    int get() const {
++        return 0;
++    }
++
+     inline Status getStatus() {
+         // The sync_wait call underlying wait() has been measured to be
+         // significantly faster than the sync_fence_info call underlying

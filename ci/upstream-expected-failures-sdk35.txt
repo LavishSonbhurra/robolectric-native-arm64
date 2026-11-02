@@ -1,0 +1,20 @@
+# module<TAB>class<TAB>test. Known failures of the arm64 library on the upstream suites at SDK 35.
+# Source: tests/upstream run with SDKS=35 of 2026-11-02 (robotests 7801/14, nativegraphics 769/1, ctesque 429/0).
+# The same 15 tests as ci/upstream-expected-failures.txt at SDK 36: 13 force LEGACY sqlite4java
+# (no linux-aarch64 native), one runs at the newest SDK with the stock loader, and
+# ShadowNativeTableMaskFilterTest fails while creating the test runner. See docs/SDK35.md.
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	uniqueConstraintViolation_errorMessage
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	error_resultsInSpecificExceptionWithCause
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSQLWithLocalizedOrUnicodeCollatorShouldBeSortedAsNoCase
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	test_setUseInMemoryDatabase
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	testSqlConversion
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeOpen_addsConnectionToPool
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	cancel_shouldCancelAllStatements
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	nativeClose_closesConnection
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsConnectionCache
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_clearsStatementCache
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	interruption_doesNotConcurrentlyModifyDatabase
+robotests	org.robolectric.shadows.ShadowSQLiteConnectionTest	reset_closesConnection
+robotests	org.robolectric.shadows.ShadowViewThreadTest	testNewestSdk
+robotests	org.robolectric.util.SQLiteLibraryLoaderTest	shouldExtractNativeLibrary
+nativegraphics	org.robolectric.shadows.ShadowNativeTableMaskFilterTest	initializationError

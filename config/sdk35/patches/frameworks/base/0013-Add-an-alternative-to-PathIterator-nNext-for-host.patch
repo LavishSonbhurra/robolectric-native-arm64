@@ -1,0 +1,46 @@
+Add an alternative to PathIterator.nNext for host
+
+Upstream: platform/frameworks/base commit c7bd207395f
+
+Why: nNextHost is in the official PathIterator table. It is the only official
+JNI name that no source file of r1 registers.
+
+diff --git a/libs/hwui/jni/PathIterator.cpp b/libs/hwui/jni/PathIterator.cpp
+index 3884342d8d3..e9de6555935 100644
+--- a/libs/hwui/jni/PathIterator.cpp
++++ b/libs/hwui/jni/PathIterator.cpp
+@@ -20,6 +20,7 @@
+ #include "GraphicsJNI.h"
+ #include "SkPath.h"
+ #include "SkPoint.h"
++#include "graphics_jni_helpers.h"
+ 
+ namespace android {
+ 
+@@ -36,6 +37,18 @@ public:
+         return reinterpret_cast<jlong>(new SkPath::RawIter(*path));
+     }
+ 
++    // A variant of 'next' (below) that is compatible with the host JVM.
++    static jint nextHost(JNIEnv* env, jclass clazz, jlong iteratorHandle, jfloatArray pointsArray) {
++        jfloat* points = env->GetFloatArrayElements(pointsArray, 0);
++#ifdef __ANDROID__
++        jint result = next(iteratorHandle, reinterpret_cast<jlong>(points));
++#else
++        jint result = next(env, clazz, iteratorHandle, reinterpret_cast<jlong>(points));
++#endif
++        env->ReleaseFloatArrayElements(pointsArray, points, 0);
++        return result;
++    }
++
+     // ---------------- @CriticalNative -------------------------
+ 
+     static jint peek(CRITICAL_JNI_PARAMS_COMMA jlong iteratorHandle) {
+@@ -72,6 +85,7 @@ static const JNINativeMethod methods[] = {
+ 
+         {"nPeek", "(J)I", (void*)SkPathIteratorGlue::peek},
+         {"nNext", "(JJ)I", (void*)SkPathIteratorGlue::next},
++        {"nNextHost", "(J[F)I", (void*)SkPathIteratorGlue::nextHost},
+ };
+ 
+ int register_android_graphics_PathIterator(JNIEnv* env) {

@@ -1,0 +1,23 @@
+Hyphenator: do not load the missing "am" pattern file
+
+Upstream: platform/frameworks/base commit 67ed6fce130422fa70c33b8822b30c7644fc10ef
+
+Why: the official nInit (0x406490) builds "af" ($0x6661), "as" ($0x7361),
+"be" ($0x6562) with no "am" ($0x6d61) in between; the only "am" left is the
+later alias at 0x40745b. This commit is from August 2025, like the file
+date of the official library.
+
+diff --git a/core/jni/android_text_Hyphenator.cpp b/core/jni/android_text_Hyphenator.cpp
+index 97b7370c1b2..4bea6da2924 100644
+--- a/core/jni/android_text_Hyphenator.cpp
++++ b/core/jni/android_text_Hyphenator.cpp
+@@ -106,8 +106,7 @@ static void init() {
+     constexpr int INDIC_MIN_PREFIX = 2;
+     constexpr int INDIC_MIN_SUFFIX = 2;
+ 
+-    addHyphenator("af", 1, 1);  // Afrikaans
+-    addHyphenator("am", 1, 1);  // Amharic
++    addHyphenator("af", 1, 1);                                // Afrikaans
+     addHyphenator("as", INDIC_MIN_PREFIX, INDIC_MIN_SUFFIX);  // Assamese
+     addHyphenator("be", 2, 2);  // Belarusian
+     addHyphenator("bg", 2, 2);  // Bulgarian

@@ -1,12 +1,14 @@
 # Fetched sources, build output and downloaded toolchains (CMake build)
 /src/
 /src-compat/
+/src-sdk35/
 /build/
 /out/
 /dist/
 /dist-compat/
 /ref/
 /rust/toolchain/
+/rust/toolchain-*/
 /toolchain/dl/
 /toolchain/out/
 /toolchain/build/
