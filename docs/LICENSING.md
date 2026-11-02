@@ -259,7 +259,7 @@ Implemented in `tools/gen_notices.py`, `config/notices-policy.toml`, `config/not
   closure. A linked archive or object without a license entry fails the build, as do the checks
   of the prototype (missing text, kind outside the policy, unacknowledged exception).
 
-Result at the pin: 48 components, 57 distinct texts, about 660 KB, no problems. 23 modules on the link
+Result at the pin: 48 components, 57 distinct texts, 652 KB, no problems. 23 modules on the link
 line contribute no object, so hardware/interfaces, expat, modp_b64 and libvintf are not in the
 file (the table in section 3 lists them because they are on the link line).
 
