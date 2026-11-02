@@ -234,5 +234,12 @@ distributed.
 2. The `release` artifact of `build.yml` (jar, bare library, notices, checksums, build info,
    attestations) and the `release-compat` artifact of `build-compat.yml` (both compat jars, both bare
    libraries, the rest prefixed `compat-` or `compat-x86pixels-` so no name clashes with `build.yml`'s) become the GitHub release.
-3. Maven Central publishing follows once the namespace is verified, from a separate workflow or from a
-   local machine with the signing key. It is not set up yet.
+3. Maven Central: run the `Upload to Maven Central` workflow (`release.yml`) by hand with the tag, from a
+   commit whose Gradle versions match the release. It rebuilds the jars from the release's libraries,
+   stops if any jar differs from the release, signs everything and uploads it to the Central Portal.
+4. The upload stops at `VALIDATED` and is private. Check it in the Portal, then press Publish, or Drop it
+   to upload again. Publish is permanent: the version can never be replaced or removed.
+
+The signing key is a dedicated RSA 4096 key, fingerprint `4E2CCCBC8495F4B2CFC79ADA40010BA3FD767082`, with no
+subkeys because Central verifies against the primary key. It expires on 2031-11-01. Secrets live in the
+`maven-central` GitHub environment, so no other workflow can read them.

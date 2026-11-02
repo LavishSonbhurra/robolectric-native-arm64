@@ -17,7 +17,7 @@
 #   * Actions are pinned by commit SHA (version in the comment next to each one).
 #   * Artifact attestations need a public repository (or GitHub Enterprise Cloud) and the
 #     permissions already requested below. No secrets are used. GITHUB_TOKEN is enough.
-#   * Publishing (GitHub release, later Maven Central) is not in this file: see docs/DISTRIBUTION.md.
+#   * Publishing (GitHub release, Maven Central) is not in this file: see docs/DISTRIBUTION.md.
 name: build
 
 on:
@@ -301,9 +301,8 @@ jobs:
           path: release
           retention-days: 90
 
-      # Publishing is a separate workflow (release.yml, not written yet): a tag push (v*) creates
-      # the GitHub release from this artifact; Maven Central publishing comes later and needs the
-      # signing key and portal token as secrets. This workflow uses no secrets.
+      # The GitHub release is made from this artifact. Maven Central is a separate workflow
+      # (release.yml) with its own secrets. This workflow uses no secrets.
 
   # ---------------------------------------------------------------------------------------------
   # Rebuild from scratch on another VM, in another directory, with another -j, no caches, and

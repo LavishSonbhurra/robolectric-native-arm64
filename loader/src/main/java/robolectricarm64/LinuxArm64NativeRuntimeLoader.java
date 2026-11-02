@@ -86,7 +86,7 @@ public class LinuxArm64NativeRuntimeLoader extends DefaultNativeRuntimeLoader {
 
   public static final String ARM64_RESOURCE = "native/linux/aarch64/libandroid_runtime.so";
 
-  /** The SDK <= 34 library (nativeruntime-dist-compat's layout), for SDK levels below 35. */
+  /** The library for SDK 34 and older (nativeruntime-dist-compat's layout), for SDK levels below 35. */
   public static final String ARM64_COMPAT_RESOURCE =
       "native/linux/aarch64/librobolectric-nativeruntime.so";
 

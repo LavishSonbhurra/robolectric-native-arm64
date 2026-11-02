@@ -110,7 +110,18 @@ tasks.named<Jar>("jar") {
     }
 }
 
+// There is no code here, so the sources and javadoc jars say where the sources are.
+listOf("sourcesJar", "javadocJar").forEach { name ->
+    tasks.named<Jar>(name) { from(rootProject.layout.projectDirectory.file("SOURCES.txt")) }
+}
+
 publishing {
+    repositories {
+        maven {
+            name = "staging"
+            url = uri(rootProject.layout.projectDirectory.dir("build/central-staging"))
+        }
+    }
     publications {
         create<MavenPublication>("maven") {
             artifactId = artifactName

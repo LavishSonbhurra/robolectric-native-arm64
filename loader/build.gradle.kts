@@ -119,11 +119,19 @@ tasks.named<Jar>("jar") {
     }
 }
 
+tasks.named<Jar>("sourcesJar") { from(layout.projectDirectory.file("../SOURCES.txt")) }
+
 tasks.named<Javadoc>("javadoc") {
     (options as StandardJavadocDocletOptions).addBooleanOption("Xdoclint:all,-missing", true)
 }
 
 publishing {
+    repositories {
+        maven {
+            name = "staging"
+            url = uri(layout.projectDirectory.dir("../build/central-staging"))
+        }
+    }
     publications {
         create<MavenPublication>("maven") {
             artifactId = artifactName

@@ -1,0 +1,99 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Uploads an existing GitHub release to the Maven Central Portal. Run by hand, once the tag's CI has
+# passed and the GitHub release exists, from a commit whose Gradle versions match that release.
+#
+# The jars are rebuilt from the release's own libraries and notices, then compared with the jars in
+# that release. Any difference stops the job, so what goes to Central is what was tested and
+# attested. The upload stops at VALIDATED: nothing is public until someone presses Publish in the
+# Portal, and that step cannot be undone. See docs/DISTRIBUTION.md, section 8.
+#
+# Secrets, in the maven-central environment:
+#   CENTRAL_USERNAME, CENTRAL_PASSWORD   a Portal user token
+#   SIGNING_KEY, SIGNING_PASSPHRASE      the release key, ASCII armored
+name: Upload to Maven Central
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v4.17-16-robolectric-13921718-3"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    environment: maven-central
+    env:
+      # Full fingerprint. The public key is on keyserver.ubuntu.com.
+      SIGNING_KEY_ID: 4E2CCCBC8495F4B2CFC79ADA40010BA3FD767082
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+
+      - name: Download the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir release
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir release
+          cd release
+          sha256sum --check --strict SHA256SUMS
+          sha256sum --check --strict compat-SHA256SUMS
+
+      - name: Build the Maven repository
+        run: |
+          ./gradlew --no-daemon publishAllPublicationsToStagingRepository --no-build-cache \
+            -Pra64.nativeLib="$PWD/release/libandroid_runtime.so" \
+            -Pra64.nativeNotice="$PWD/release/THIRD_PARTY_NOTICES" \
+            -Pra64.compatLib="$PWD/release/librobolectric-nativeruntime.so" \
+            -Pra64.compatNotice="$PWD/release/compat-THIRD_PARTY_NOTICES" \
+            -Pra64.compatX86Lib="$PWD/release/librobolectric-nativeruntime-x86pixels.so" \
+            -Pra64.compatX86Notice="$PWD/release/compat-x86pixels-THIRD_PARTY_NOTICES"
+
+      - name: Compare the jars with the release
+        run: |
+          status=0
+          for jar in release/*.jar; do
+            name=$(basename "$jar")
+            built=$(find build/central-staging -name "$name")
+            if ! cmp "$jar" "$built"; then
+              echo "::error::$name differs from the release"
+              status=1
+            fi
+          done
+          exit "$status"
+
+      - name: Sign and bundle
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
+        run: |
+          GNUPGHOME=$(mktemp -d)
+          export GNUPGHOME
+          printenv SIGNING_KEY | gpg --batch --quiet --import
+          passphrase_file="$GNUPGHOME/passphrase"
+          printenv SIGNING_PASSPHRASE > "$passphrase_file"
+          python3 tools/central_bundle.py --repo build/central-staging --key "$SIGNING_KEY_ID" \
+            --passphrase-file "$passphrase_file" --out central-bundle.zip
+          rm -rf "$GNUPGHOME"
+
+      - name: Upload
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+        run: python3 tools/central_upload.py --bundle central-bundle.zip --name "$TAG"
