@@ -1,8 +1,8 @@
 # Distribution
 
-Releases up to `v4.17-16-robolectric-13921718-3` are on GitHub only. Nothing is on Maven Central yet.
-The layout below is the one for Maven Central, starting with `4.17-1`, and has not been released yet.
-Central versions are permanent, so it is written down here first.
+Releases up to `v4.17-16-robolectric-13921718-3` are on GitHub only, in an earlier layout with the SDK 36
+library inside the loader jar. From `4.17-1` on, releases use the layout below and are on Maven Central
+as well as GitHub. Central versions are permanent.
 
 | | |
 | --- | --- |
@@ -114,9 +114,9 @@ under `org.robolectric`, which belongs to the Robolectric project.
 
 ### Gradle (Kotlin DSL), JVM or Android module
 
-Until the artifacts are on Maven Central, replace the coordinate with `files(...)` entries for the
-loader jar and the library jars you need from the GitHub release: a file dependency has no POM, so it
-brings nothing with it.
+Without access to Maven Central, replace the coordinate with `files(...)` entries for the loader jar
+and the library jars you need from the GitHub release: a file dependency has no POM, so it brings
+nothing with it.
 
 ```kotlin
 dependencies {

@@ -35,15 +35,12 @@ One tree builds every library, and one dependency brings them all:
 * SDK 35 and 37 are newer than the other libraries and less verified: see
   [How it was verified](#how-it-was-verified), and [docs/SDK35.md](docs/SDK35.md) and
   [docs/SDK37.md](docs/SDK37.md) for what is not.
-* Released on GitHub:
-  [v4.17-16-robolectric-13921718-3](https://github.com/LavishSonbhurra/robolectric-native-arm64/releases/tag/v4.17-16-robolectric-13921718-3)
-  (SDK 26 to 34 and 36, in the earlier layout), built and attested by CI on GitHub's arm64 runners. The
-  layout described here, with SDK 35 and 37, is not released yet and has not been through CI. Maven Central
-  comes with it.
+* Latest release: [v4.17-1](https://github.com/LavishSonbhurra/robolectric-native-arm64/releases/tag/v4.17-1),
+  on Maven Central and GitHub, built and attested by CI on GitHub's arm64 runners.
 
 ## Quick start
 
-Once `4.17-1` is on Maven Central:
+From Maven Central:
 
 ```kotlin
 dependencies {
