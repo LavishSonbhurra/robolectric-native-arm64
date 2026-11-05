@@ -17,6 +17,20 @@ moving to a new AOSP release is a change of a tag and not a port.
 This is an unofficial community build. It is not affiliated with, endorsed by or supported by Google or the
 Robolectric project. "Android" is a trademark of Google LLC.
 
+## Official support is coming
+
+Robolectric has merged official Linux arm64 support for SDK 26 to 37
+([robolectric#11625](https://github.com/robolectric/robolectric/pull/11625),
+[robolectric#11633](https://github.com/robolectric/robolectric/pull/11633)):
+`nativeruntime-dist-compat` 1.0.20 and new `android-all` jars for SDK 35 to 37 include the libraries, and
+Robolectric's own loader accepts Linux arm64. It is not in a Robolectric release yet; 4.17 is the latest.
+
+* On Robolectric 4.17, use this project.
+* Once you upgrade to a Robolectric release with that support, remove this dependency. The loader here
+  works with 4.17 only.
+* The x86pixels build remains the only way to get the x86_64 library's exact pixels on arm64, for SDK 26
+  to 34.
+
 ## Status
 
 One tree builds every library, and one dependency brings them all:
