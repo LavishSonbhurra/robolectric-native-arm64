@@ -17,19 +17,21 @@ moving to a new AOSP release is a change of a tag and not a port.
 This is an unofficial community build. It is not affiliated with, endorsed by or supported by Google or the
 Robolectric project. "Android" is a trademark of Google LLC.
 
-## Official support is coming
+## Robolectric 4.18 supports Linux arm64 officially
 
-Robolectric has merged official Linux arm64 support for SDK 26 to 37
-([robolectric#11625](https://github.com/robolectric/robolectric/pull/11625),
-[robolectric#11633](https://github.com/robolectric/robolectric/pull/11633)):
-`nativeruntime-dist-compat` 1.0.20 and new `android-all` jars for SDK 35 to 37 include the libraries, and
-Robolectric's own loader accepts Linux arm64. It is not in a Robolectric release yet; 4.17 is the latest.
+[Robolectric 4.18](https://github.com/robolectric/robolectric/releases/tag/robolectric-4.18) includes
+Linux arm64 native libraries for SDK 26 to 37 and needs no plugin. If you can upgrade, use it and remove
+this dependency: the loader here works with Robolectric 4.17 only.
 
-* On Robolectric 4.17, use this project.
-* Once you upgrade to a Robolectric release with that support, remove this dependency. The loader here
-  works with 4.17 only.
-* The x86pixels build remains the only way to get the x86_64 library's exact pixels on arm64, for SDK 26
-  to 34.
+This project remains for two cases:
+
+* Robolectric 4.17 on Linux arm64.
+* The x86pixels build, which renders exactly like the x86_64 library on arm64 for SDK 26 to 34. The
+  official arm64 library does not.
+
+It is no longer developed: no new SDK levels and no port to newer Robolectric versions. The releases
+and the Maven Central artifacts stay available. One known gap: the SDK 35 library does not support
+`ImageDecoder` file sources.
 
 ## Status
 

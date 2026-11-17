@@ -15,7 +15,7 @@
 #   rig             host runner, needs build; native arm64 JVM, Gradle, Robolectric 4.17; about 15 to 25 min
 #   package         host runner, needs build and rig; the library jar, checksums, provenance attestation
 #   package-loader  host runner, needs rig; the loader jar, which holds no library
-#   reproduce       container, needs build; clean rebuild in another path and VM; weekly, on tags and
+#   reproduce       container, needs build; clean rebuild in another path and VM; on tags and
 #                   on demand. Compares the stripped library byte for byte (ci/compare-libs.py).
 #   upstream        optional (manual or tag): Robolectric's own suites at that SDK, about 25 min
 #
@@ -41,8 +41,6 @@ on:
         description: "Also run Robolectric's upstream suites"
         type: boolean
         default: false
-  schedule:
-    - cron: "23 4 * * 1"   # Mondays: reproducibility check and a look at cache health
 
 permissions:
   contents: read
@@ -382,7 +380,7 @@ jobs:
   # to match. Until this has passed once, the claim is "not yet known to be reproducible".
   reproduce:
     needs: build
-    if: github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v') || inputs.reproduce
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.reproduce
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 330
     strategy:

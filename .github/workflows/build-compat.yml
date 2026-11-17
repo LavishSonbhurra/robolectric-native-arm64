@@ -42,8 +42,6 @@ on:
         description: "Also run the upstream suites on x86_64 with the official library"
         type: boolean
         default: false
-  schedule:
-    - cron: "41 4 * * 1"
 
 permissions:
   contents: read
@@ -289,7 +287,7 @@ jobs:
   # ---------------------------------------------------------------------------------------------
   reproduce:
     needs: build
-    if: github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v') || inputs.reproduce
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.reproduce
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     strategy:

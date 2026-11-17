@@ -62,7 +62,7 @@ separately (exit status 3) to make it easy to recognise.
    (`ci/compare-libs.py`). Any difference fails the job, including one confined to the build-id;
 5. on a failure runs `diffoscope` over both libraries and uploads the report.
 
-It runs weekly, on release tags and on request, not on every push, because it costs another 40 to 60
+It runs on release tags and on request, not on every push, because it costs another 40 to 60
 minutes of runner time.
 
 Optional quick check (not in the workflow): generate the CMake files twice with different
